@@ -174,3 +174,7 @@ if __name__ == "__main__":
             # Print a warning if the safety system is pulling power
             if act_pwm < 1.0:
                 print(f"  -> THERMAL THROTTLE ACTIVE: Pump power reduced to {act_pwm*100:.1f}%")
+
+
+
+    print(comp.flow_curve)
