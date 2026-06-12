@@ -44,9 +44,9 @@ class SMC_AKH10_NRV:
         
         # Formulate final output telemetry
         delta_p_mbar = (P_in_pa - P_out_pa) / 100.0
-        P_out_bar = P_out_pa / 100000.0
+        # P_out_bar = P_out_pa / 100000.0
 
-        return P_out_bar, delta_p_mbar
+        return P_out_pa, delta_p_mbar, T_in_k
 
 
 # =====================================================================

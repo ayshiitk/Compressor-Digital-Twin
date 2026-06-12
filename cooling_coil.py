@@ -20,7 +20,7 @@ class CopperCoolingCoil_TwinFan:
         # 3. Fan Performance Properties (SUNON PF97332BX x 2)
         # Max free delivery is 53.6 CFM per fan. Under static restriction of the 
         # tight coil bundle, we assume the pair operates at ~65% free airflow capacity.
-        self.cfm_per_fan = 53.6
+        self.cfm_per_fan = 53.6*2
         self.estimated_efficiency = 0.65
         self.total_cooling_vol_flow = (2.0 * self.cfm_per_fan * self.estimated_efficiency) * 0.000471947 # Convert CFM to m3/s
         
@@ -128,14 +128,16 @@ class CopperCoolingCoil_TwinFan:
         
         excess_length = L_eval - L_required if selected_length is not None else 0.0
         
-        return {
-            "L_required_meters": L_required,
-            "T_final_celsius": T_final_k - 273.15,
-            "T_ambient_out_celsius": T_ambient_out_celsius,
-            "pressure_drop_mbar": delta_p_pa / 100.0,
-            "P_out_bar": P_out_bar,
-            "excess_length_meters": excess_length
-        }
+        # return {
+        #     "L_required_meters": L_required,
+        #     "T_final_celsius": T_final_k - 273.15,
+        #     "T_ambient_out_celsius": T_ambient_out_celsius,
+        #     "pressure_drop_mbar": delta_p_pa / 100.0,
+        #     "P_out_bar": P_out_bar,
+        #     "excess_length_meters": excess_length
+        # }
+
+        return T_final_k - 273.15, T_ambient_out_celsius, P_out_pa
 
 # =====================================================================
 # SYSTEM EVALUATION
@@ -151,22 +153,3 @@ if __name__ == "__main__":
     
     # SCENARIO A: Calculate what the system mathematically needs
     ideal_results = coil_solver.analyze_coil(mass_flow, pressure_inlet, temperature_inlet, ambient_room)
-    
-    print("=== OPTIMUM COOLING COIL DESIGN PARAMETERS ===")
-    print(f"Required Length to hit 1°C of Ambient: {ideal_results['L_required_meters']:.3f} meters")
-    print(f"Compressed Air Exit Temp:              {ideal_results['T_final_celsius']:.2f} °C")
-    print(f"Actual Gas Outlet Pressure:            {ideal_results['P_out_bar']:.3f} Bar absolute")
-    print(f"Pressure Drop:                 {ideal_results['pressure_drop_mbar']:.1f} mBar")
-    print(f"Exhaust Ambient Air Temp (to pump):    {ideal_results['T_ambient_out_celsius']:.2f} °C")
-    print("-" * 55)
-    
-    # SCENARIO B: If you pick a standard off-the-shelf physical length
-    custom_length = 3.36
-    custom_results = coil_solver.analyze_coil(mass_flow, pressure_inlet, temperature_inlet, ambient_room, selected_length=custom_length)
-    
-    print(f"=== PERFORMANCE ANALYSIS FOR SELECTED LENGTH ({custom_length}m) ===")
-    print(f"Actual Compressed Air Exit Temp:       {custom_results['T_final_celsius']:.2f} °C")
-    print(f"Actual Gas Outlet Pressure:            {custom_results['P_out_bar']:.3f} Bar absolute")
-    print(f"Total Pressure Drop Over Coil:          {custom_results['pressure_drop_mbar']:.1f} mBar")
-    print(f"Exhaust Ambient Air Temp (to pump):    {custom_results['T_ambient_out_celsius']:.2f} °C")
-    print(f"Calculated Excess Length Used:          {custom_results['excess_length_meters']:.3f} meters")

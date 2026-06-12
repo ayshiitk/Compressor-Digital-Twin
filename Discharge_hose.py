@@ -108,7 +108,8 @@ class DischargeHose_HiPoFlex:
         # Total Watts of heat radiated into the still room air
         heat_loss_watts = C_min * (T_in_k - T_out_k)
 
-        return P_out_pa, T_out_k, heat_loss_watts
+        return P_out_pa, T_out_k 
+    
 
 
 # =====================================================================

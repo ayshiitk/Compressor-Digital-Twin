@@ -108,7 +108,7 @@ class SMC_AFM20_MistSeparator:
     #         "water_escaped_mg_s": water_escaped_mg_s
     #     }
     
-    def update_state(self, m_dot_in_kg_s, P_in_pa, T_in_k, aerosol_water_in_mg_s, dt_seconds=1.0):
+    def update_state(self, m_dot_in_kg_s, P_in_pa, T_in_k, aerosol_water_in_mg_s, dt_seconds):
         """
         Processes a single simulation time step through the Mist Separator node.
         """
@@ -137,14 +137,17 @@ class SMC_AFM20_MistSeparator:
             
         self.saturation_ratio = self.current_water_mass_mg / self.element_capacity_mg
         
-        return {
-            "P_out_pa": P_bowl_pa,
-            "dp_pa": dp_pa,
-            "m_dot_out_kg_s": m_dot_effective,
-            "m_dot_leak_kg_s": m_dot_leak_kg_s,
-            "saturation_percent": self.saturation_ratio * 100.0,
-            "water_escaped_mg_s": water_escaped_mg_s
-        }
+        q_nlpm = (m_dot_effective / 1.204) * 60000.0
+
+        return P_bowl_pa, dp_pa, q_nlpm, water_escaped_mg_s
+        # return {
+        #     "P_out_pa": P_bowl_pa,
+        #     "dp_pa": dp_pa,
+        #     "m_dot_out_kg_s": m_dot_effective,
+        #     "m_dot_leak_kg_s": m_dot_leak_kg_s,
+        #     "saturation_percent": self.saturation_ratio * 100.0,
+        #     "water_escaped_mg_s": water_escaped_mg_s
+        # }
 
 # ==========================================
 # TEST EXECUTION BLOCK
