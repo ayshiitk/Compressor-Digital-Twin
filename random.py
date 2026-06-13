@@ -279,6 +279,9 @@ if __name__ == "__main__":
     Air_filter = af.SMC_AF20_Filter()
     Water_sep = ws.SMC_AFG20_WaterSeparator()
     Mist_sep = ms.SMC_AFM20_MistSeparator()
+    # Air_filter = af.SMC_AF20_Filter(valve_closed=True)
+    # Water_sep = ws.SMC_AFG20_WaterSeparator(valve_closed=True)
+    # Mist_sep = ms.SMC_AFM20_MistSeparator(valve_closed=True)
     
     # System Constants
     pressure_intake_pa = 100000.0   
@@ -316,6 +319,8 @@ if __name__ == "__main__":
             flow_exp=80,
             external_inflow_nlpm= q_nlpm_mist  # <--- BRIDGE CONNECTED HERE
         )
+
+        print(p_tank_gauge)
         p_tank_abs_pa = (p_tank_gauge * 100000.0) + 101325.0
 
 #        COMPRESSOR
@@ -394,5 +399,5 @@ if __name__ == "__main__":
         current_blower_cfm = max(2 * fan_cfm, 0)  
 
         # Print logic
-        # if t % 50.0 < dt_s:  
-        #     print(f"Time: {t:.2f} s | Tank Pres: {p_tank_gauge:.2f} Bar | Flow In: {q_nlpm_mist:.1f} NLPM | Blower: {current_blower_cfm:.1f} CFM | Head Temp: {temp_head_k - 273.15:.1f} °C")
+        if t % 50.0 < dt_s:  
+            print(f"Time: {t:.2f} s | Tank Pres: {p_tank_gauge:.2f} Bar | Flow In: {q_nlpm_mist:.1f} NLPM | Blower: {current_blower_cfm:.1f} CFM | Head Temp: {temp_head_k - 273.15:.1f} °C")
