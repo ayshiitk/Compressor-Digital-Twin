@@ -95,6 +95,9 @@ class CopperCoolingCoil_TwinFan:
         UA_per_meter = U_out * math.pi * self.D_out
         
         # --- Task 1: Find Required Length for 1°C Approach ---
+        if T_in_k <= T_target_out_k:
+            return T_in_k - 273.15, T_amb_k - 273.15, P_in_pa  # No cooling needed; return inputs as outputs
+            # raise ValueError("Inlet temperature must be greater than target outlet temperature for cooling to occur.")  
         C_min = m_dot_kg_s * self.cp_air
         NTU_req = -math.log(target_approach / (T_in_k - T_amb_k))
         L_required = (NTU_req * C_min) / UA_per_meter

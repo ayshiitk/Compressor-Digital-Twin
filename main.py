@@ -8,7 +8,8 @@ import NRV as nrv
 import air_filter as af
 import water_separater as ws
 import mist_separator as ms
-
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # ==========================================
 # 1. THE PID CONTROLLER
@@ -219,7 +220,9 @@ class SmartCompressor_120RND:
         # Step 2: Pneumatic & Electrical Flow
         if delta_p_bar > 8.0 or actual_pwm == 0.0:
             mass_flow_kg_s = 0.0
+            flow_nlpm = 0.0
             current_amps = 0.0
+            total_electrical_power_w = 0.0
             temp_out_gas_k = temp_up_k
             heat_head_w = 0.0
             heat_motor_w = 0.0
@@ -279,13 +282,13 @@ if __name__ == "__main__":
     Air_filter = af.SMC_AF20_Filter()
     Water_sep = ws.SMC_AFG20_WaterSeparator()
     Mist_sep = ms.SMC_AFM20_MistSeparator()
-    # Air_filter = af.SMC_AF20_Filter(valve_closed=True)
-    # Water_sep = ws.SMC_AFG20_WaterSeparator(valve_closed=True)
-    # Mist_sep = ms.SMC_AFM20_MistSeparator(valve_closed=True)
+    # Air_filter = af.SMC_AF20_Filter(valve_closed= True  )  # Simulating the unvalved 1.8mm leak
+    # Water_sep = ws.SMC_AFG20_WaterSeparator(valve_closed= True  )  # Simulating the unvalved 1.8mm leak
+    # Mist_sep = ms.SMC_AFM20_MistSeparator(valve_closed= True  )  # Simulating the unvalved 1.8mm leak
     
     # System Constants
     pressure_intake_pa = 100000.0   
-    temp_room_k = 273.15 + 40.0    # 40°C Room
+    temp_room_k = 273.15 + 35.0    # 35°C Room
     
     # Sync the compressor's ambient cooling temp to the room temp
     comp.temp_motor_k = temp_room_k
@@ -297,14 +300,28 @@ if __name__ == "__main__":
         volume_liters=2.0,
         motor_voltage_v=24.0
     )
-    total_time_s = 600.0
+    total_time_s = 6000
     time = np.arange(0, total_time_s, dt_s)
+
+    # =================================================================
+    hist_time = []
+    hist_p_tank = []
+    hist_pwm = []
+    hist_power = []
+    hist_temp_motor_c = []
+    hist_temp_head_c = []
+    hist_q_mist = []
+    hist_q_vent = []
+    hist_blower_cfm = []
+
+
     
     # Initialize variables for t=0
     current_blower_cfm = 0.0 
     current_compressor_flow_nlpm = 0.0 
     q_nlpm_mist = None # Starts at 0
 
+    actual_system_friction_pa = 0.0
     p_tank_abs_pa = 101325.0
 
     for t in time:
@@ -320,30 +337,58 @@ if __name__ == "__main__":
             external_inflow_nlpm= q_nlpm_mist  # <--- BRIDGE CONNECTED HERE
         )
 
-        print(p_tank_gauge)
+        # print(p_tank_gauge)
         p_tank_abs_pa = (p_tank_gauge * 100000.0) + 101325.0
 
-#        COMPRESSOR
+
+
+        # =====================================================================
+        # 2. THE COMPRESSOR
+        # =====================================================================
+        # EXACT CALCULATION: Tank Pressure + The exact friction measured on the last loop
+        p_comp_discharge_pa = p_tank_abs_pa + actual_system_friction_pa
 
         (current_compressor_flow_nlpm, current_amps, temp_out_gas_k, 
          act_pwm, temp_motor_k, temp_head_k, power_w) = comp.update_system_state(
             p_up_pa = pressure_intake_pa, 
             temp_up_k = temp_room_k, 
-            p_down_pa = p_tank_abs_pa,           # Pushing against tank pressure
-            req_pump_pwm = requested_pwm,        # Speed commanded by tank logic
-            req_blower_cfm = current_blower_cfm, # Cooling from PID
+            p_down_pa = p_comp_discharge_pa,     # <--- Uses the exact calculated pressure
+            req_pump_pwm = requested_pwm,        
+            req_blower_cfm = current_blower_cfm, 
             dt_s = dt_s
         )
         m_dot_kg_s = (current_compressor_flow_nlpm / 1000.0 / 60.0) * comp.rho_normal
 
-        #  HOSE
-
+        # =====================================================================
+        # 3. DISCHARGE HOSE
+        # =====================================================================
         P_out_pa_hose, T_out_k_hose = hose.calculate_hose_state(
             m_dot_kg_s = m_dot_kg_s,
-            P_in_pa = p_tank_abs_pa,  
+            P_in_pa = p_comp_discharge_pa,       # <--- Hose starts at the exact discharge pressure
             T_in_k = temp_out_gas_k,
             T_amb_k = temp_room_k 
         )
+#        COMPRESSOR
+
+        # (current_compressor_flow_nlpm, current_amps, temp_out_gas_k, 
+        #  act_pwm, temp_motor_k, temp_head_k, power_w) = comp.update_system_state(
+        #     p_up_pa = pressure_intake_pa, 
+        #     temp_up_k = temp_room_k, 
+        #     p_down_pa = p_tank_abs_pa,           # Pushing against tank pressure
+        #     req_pump_pwm = requested_pwm,        # Speed commanded by tank logic
+        #     req_blower_cfm = current_blower_cfm, # Cooling from PID
+        #     dt_s = dt_s
+        # )
+        # m_dot_kg_s = (current_compressor_flow_nlpm / 1000.0 / 60.0) * comp.rho_normal
+
+        # #  HOSE
+
+        # P_out_pa_hose, T_out_k_hose = hose.calculate_hose_state(
+        #     m_dot_kg_s = m_dot_kg_s,
+        #     P_in_pa = p_tank_abs_pa,  
+        #     T_in_k = temp_out_gas_k,
+        #     T_amb_k = temp_room_k 
+        # )
 
 #       COOLING_COIL
         T_out_k_coil, T_ambient_out_celsius, P_out_pa_coil = Cooling_coil.analyze_coil(
@@ -389,7 +434,7 @@ if __name__ == "__main__":
 
     
         # Convert tank gauge pressure to Absolute Pascals for the thermodynamic math
-       
+        # p_tank_abs_pa = (p_tank_gauge * 100000.0) + 101325.0
         
         # 3. RUN PID CONTROLLER based on the new head temperature
         fan_pwm = pid.update(temp_head_k - 273.15, dt_s)
@@ -398,6 +443,123 @@ if __name__ == "__main__":
         fan_cfm = get_cfm_from_pwm(fan_pwm)
         current_blower_cfm = max(2 * fan_cfm, 0)  
 
+        # =====================================================================
+        # MEASURE EXACT FRICTION FOR THE NEXT TIMESTEP
+        # =====================================================================
+        # Total friction = The pressure leaving the compressor MINUS the pressure that survived to the Mist Separator
+        actual_system_friction_pa = max(0.0, p_comp_discharge_pa - P_out_pa_mist)
+
+        if t % 2 < dt_s:
+            hist_time.append(t)
+            hist_p_tank.append(p_tank_gauge)
+            hist_pwm.append(act_pwm * 100.0) 
+            hist_power.append(power_w) 
+            hist_temp_motor_c.append(temp_motor_k - 273.15) 
+            hist_temp_head_c.append(temp_head_k - 273.15)   
+            hist_q_mist.append(q_nlpm_mist)
+            hist_q_vent.append(q_vent_out)
+            hist_blower_cfm.append(current_blower_cfm)
+
         # Print logic
-        if t % 50.0 < dt_s:  
-            print(f"Time: {t:.2f} s | Tank Pres: {p_tank_gauge:.2f} Bar | Flow In: {q_nlpm_mist:.1f} NLPM | Blower: {current_blower_cfm:.1f} CFM | Head Temp: {temp_head_k - 273.15:.1f} °C")
+        # if t % 2.0 < dt_s:  
+        #     print(f"Time: {t:.2f} s | Tank Pres: {p_tank_gauge:.2f} Bar | Flow In: {q_nlpm_mist:.1f} NLPM | Blower: {current_blower_cfm:.1f} CFM | Head Temp: {temp_head_k - 273.15:.1f} °C")
+
+
+
+
+print("Generating Interactive Dashboard...")
+
+fig = make_subplots(
+    rows=5, cols=1, 
+    shared_xaxes=True, 
+    vertical_spacing=0.05,
+    subplot_titles=(
+        "1. Tank Pressure (Bar Gauge)", 
+        "2. Pneumatic Flows (NLPM)", 
+        "3. Thermal States (°C)", 
+        "4. Electrical Power (Watts)", 
+        "5. Compressor Motor Control (%)"
+    )
+)
+
+# --- ROW 1: Pressure ---
+fig.add_trace(go.Scatter(x=hist_time, y=hist_p_tank, name="Tank Pressure", line=dict(color='blue', width=2)), row=1, col=1)
+
+# --- ROW 2: Flows (Supply vs Demand) ---
+fig.add_trace(go.Scatter(x=hist_time, y=hist_q_vent, name="Ventilator Demand", line=dict(color='orange', dash='dash', width=2)), row=2, col=1)
+fig.add_trace(go.Scatter(x=hist_time, y=hist_q_mist, name="Supplied by Compressor", line=dict(color='green', width=2)), row=2, col=1)
+
+# --- ROW 3: Temperatures ---
+fig.add_trace(go.Scatter(x=hist_time, y=hist_temp_head_c, name="Compressor Head Temp", line=dict(color='red', width=2)), row=3, col=1)
+fig.add_trace(go.Scatter(x=hist_time, y=hist_temp_motor_c, name="Motor Temp", line=dict(color='darkred', dash='dot', width=2)), row=3, col=1)
+
+# --- ROW 4: Power ---
+fig.add_trace(go.Scatter(x=hist_time, y=hist_power, name="Power Consumption", line=dict(color='purple', width=2)), row=4, col=1)
+
+# --- ROW 5: PWM Duty Cycle ---
+fig.add_trace(go.Scatter(x=hist_time, y=hist_pwm, name="Motor PWM", line=dict(color='black', width=2)), row=5, col=1)
+fig.add_trace(go.Scatter(x=hist_time, y=hist_blower_cfm, name="Blower CFM", line=dict(color='teal', dash='dash', width=2)), row=5, col=1)
+
+# UI & Layout Upgrades
+fig.update_layout(
+    title="Digital Twin Telemetry Dashboard",
+    height=1200,          
+    template="plotly_white", 
+    hovermode="x unified",   # The magic hover feature!
+    showlegend=True,
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+)
+
+fig.update_xaxes(title_text="Time (Seconds)", row=5, col=1)
+fig.update_yaxes(range=[0, 105], row=5, col=1)
+
+# =====================================================================
+# DYNAMIC HOVER TIME FORMATTING
+# =====================================================================
+# 1. Generate the formatted time string for every single data point
+formatted_hover_times = []
+for s in hist_time:
+    if s < 60:
+        formatted_hover_times.append(f"{s:.1f}s")
+    elif s < 3600:
+        m = int(s // 60)
+        sec = s % 60
+        formatted_hover_times.append(f"{m}m {sec:.1f}s")
+    else:
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
+        sec = s % 60
+        formatted_hover_times.append(f"{h}h {m}m {sec:.0f}s")
+
+# 2. Inject this custom text into EVERY line on the graph
+# Using 'update_traces' saves you from having to type it into all 8 lines manually!
+fig.update_traces(
+    customdata=formatted_hover_times,
+    hovertemplate="%{y:.2f}  |  %{customdata}"
+)
+
+# =====================================================================
+# 3. Standard UI & Layout Upgrades
+# =====================================================================
+fig.update_layout(
+    title="Digital Twin Telemetry Dashboard",
+    height=1200,          
+    template="plotly_white", 
+    hovermode="x unified",   
+    showlegend=True,
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+)
+
+# Put the main x-axis back to standard numbers
+fig.update_xaxes(title_text="Time (Seconds)", row=5, col=1)
+fig.update_yaxes(range=[0, 105], row=5, col=1)
+
+
+
+
+
+# fig.show()
+# Replaces fig.show()
+print("Saving dashboard to 'Digital_Twin_Dashboard.html'...")
+fig.write_html("Digital_Twin_Dashboard.html")
+print("Done! Open the HTML file in your folder to view it.")

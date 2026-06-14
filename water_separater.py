@@ -1,5 +1,5 @@
 import numpy as np
-
+import math
 class SMC_AFG20_WaterSeparator:
     """
     Digital Twin Component: SMC AFG20-F02-J-D Water Separator
@@ -19,8 +19,24 @@ class SMC_AFG20_WaterSeparator:
         
         # Leakage Configuration ("J" Option)
         self.drain_valve_closed = valve_closed 
-        self.drain_hole_area_m2 = np.pi * ((1.8 / 1000.0 / 2)**2) 
-        self.Cd_drain = 0.62     
+
+        # Leakage Configuration
+        self.drain_valve_closed = valve_closed 
+        
+        # ---------------------------------------------------------
+        # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
+        # ---------------------------------------------------------
+        d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
+        d2_restrictor_m = .50 / 1000.0  # Added pipe restrictor
+        
+        A1 = math.pi * (d1_bowl_m / 2.0)**2
+        A2 = math.pi * (d2_restrictor_m / 2.0)**2
+        
+        # Calculate the equivalent aerodynamic area of both holes in series
+        self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
+        
+        self.Cd_drain = 0.62  # Standard discharge coefficient
+ 
 
     def _calculate_condensation(self, T_amb_C, RH_amb, P_amb_pa, T_coil_C, P_coil_pa, m_dot_total_kg_s):
         """
@@ -40,8 +56,32 @@ class SMC_AFG20_WaterSeparator:
         m_dot_water_in_kg_s = m_dot_dry_air * omega_in
         
         # --- STAGE 2: COIL EXHAUST (Compressed & Cooled) ---
-        P_sat_coil_pa = (10 ** (A - B / (T_coil_C + C))) * 133.322
-        omega_max_coil = 0.622 * (P_sat_coil_pa / (P_coil_pa - P_sat_coil_pa))
+
+
+
+
+
+        # ---------------------------------------------------------
+        # THERMODYNAMIC CLAMP: Protect the Antoine Equation
+        # The Antoine formula is only valid between 0°C and 100°C.
+        # This prevents math explosions if the air temp spikes for 1 millisecond.
+        # ---------------------------------------------------------
+        T_safe_C = max(0.0, min(100.0, T_coil_C))
+        
+        # Calculate Saturation Pressure (P_sat) using the clamped temperature
+        # 133.322 converts mmHg to Pascals
+        P_sat_coil_pa = (10 ** (A - B / (T_safe_C + C))) * 133.322
+
+
+
+        # P_sat_coil_pa = (10 ** (A - B / (T_coil_C + C))) * 133.322
+        # omega_max_coil = 0.622 * (P_sat_coil_pa / (P_coil_pa - P_sat_coil_pa))
+
+        # Safely calculate the dry air pressure (preventing division by zero)
+        P_dry_air_pa = max(1.0, P_coil_pa - P_sat_coil_pa)
+        
+        # Calculate maximum humidity ratio
+        omega_max_coil = 0.622 * (P_sat_coil_pa / P_dry_air_pa)
         
         # --- STAGE 3: PHASE CHANGE (Condensation) ---
         if omega_in > omega_max_coil:
@@ -70,17 +110,41 @@ class SMC_AFG20_WaterSeparator:
             
         return max(0.0, min(self.eta_max, efficiency))
 
+    # def calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
+    #     """Handles choked (sonic) vs subsonic leakage through the drain hole."""
+    #     if self.drain_valve_closed or P_in_pa <= P_atm_pa: 
+    #         return 0.0 
+
+    #     # if self.drain_valve_closed: return 0.0 
+    #     pr = P_atm_pa / P_in_pa
+    #     gamma = 1.4
+    #     critical_ratio = (2 / (gamma + 1)) ** (gamma / (gamma - 1))
+        
+    #     if pr <= critical_ratio:
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1)))
+    #     else:
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2 * gamma / (gamma - 1)) / (self.R_air * T_in_k) * (pr ** (2/gamma) - pr ** ((gamma + 1)/gamma)))
+    #     return m_dot_leak
+    
     def _calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
-        """Handles choked (sonic) vs subsonic leakage through the drain hole."""
-        if self.drain_valve_closed: return 0.0 
+        """Calculates the continuous air purge escaping through the restrictor."""
+        
+        # SAFETY CHECK: No leaking if valve is closed OR if system is in a vacuum!
+        if self.drain_valve_closed or P_in_pa <= P_atm_pa:
+            return 0.0 
+            
         pr = P_atm_pa / P_in_pa
         gamma = 1.4
-        critical_ratio = (2 / (gamma + 1)) ** (gamma / (gamma - 1))
+        critical_ratio = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
         
+        # Calculate Mass Flow Rate leaking through the equivalent restrictor area
         if pr <= critical_ratio:
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * np.sqrt(gamma / (self.R_air * T_in_k)) * (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1)))
+            # Choked (Sonic) Flow
+            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
         else:
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * np.sqrt((2 * gamma / (gamma - 1)) / (self.R_air * T_in_k) * (pr ** (2/gamma) - pr ** ((gamma + 1)/gamma)))
+            # Subsonic Flow
+            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2.0 * gamma / (gamma - 1.0)) / (self.R_air * T_in_k) * (pr ** (2.0/gamma) - pr ** ((gamma + 1.0)/gamma)))
+            
         return m_dot_leak
 
     def update_state(self, m_dot_in_kg_s, P_in_pa, T_in_k, T_amb_C, RH_amb, P_amb_pa=101325.0):

@@ -50,7 +50,7 @@ class DischargeHose_HiPoFlex:
         """
         # If the compressor is completely off, return ambient/static conditions
         if m_dot_kg_s <= 0.0001:
-            return P_in_pa, T_amb_k, 0.0
+            return P_in_pa, T_amb_k
 
         # Fetch live air properties based on incoming temperature
         mu_air, k_air, Pr_air = self._get_dynamic_air_properties(T_in_k)

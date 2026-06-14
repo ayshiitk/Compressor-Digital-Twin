@@ -16,9 +16,21 @@ class SMC_AF20_Filter:
         
         # Leakage Configuration ("J" Option Auto-Drain)
         self.drain_valve_closed = valve_closed 
-        self.drain_hole_area_m2 = math.pi * ((1.8 / 1000.0 / 2)**2) 
-        self.Cd_drain = 0.62  
         
+        # ---------------------------------------------------------
+        # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
+        # ---------------------------------------------------------
+        d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
+        d2_restrictor_m = .50 / 1000.0  # Added pipe restrictor
+        
+        A1 = math.pi * (d1_bowl_m / 2.0)**2
+        A2 = math.pi * (d2_restrictor_m / 2.0)**2
+        
+        # Calculate the equivalent aerodynamic area of both holes in series
+        self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
+        
+        self.Cd_drain = 0.62  # Standard discharge coefficient
+
         # Self-Calibrate coefficients from chart anchor inputs
         self.alpha_viscous, self.beta_inertial = self._execute_factory_calibration(
             point1_lpm, point1_dp_mbar, point2_lpm, point2_dp_mbar, p_cal_gauge_mpa
@@ -63,20 +75,42 @@ class SMC_AF20_Filter:
         
         return alpha, beta
 
+    # def _calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
+    #     """Handles choked (sonic) vs subsonic leakage through the bowl drain hole."""
+    #     if self.drain_valve_closed or P_in_pa <= P_atm_pa: 
+    #         return 0.0 
+            
+    #     pr = P_atm_pa / P_in_pa
+    #     gamma = 1.4
+    #     critical_ratio = (2 / (gamma + 1)) ** (gamma / (gamma - 1))
+        
+    #     if pr <= critical_ratio:
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1)))
+    #     else:
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2 * gamma / (gamma - 1)) / (self.R_air * T_in_k) * (pr ** (2/gamma) - pr ** ((gamma + 1)/gamma)))
+        
+    #     return m_dot_leak
+    
+
     def _calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
-        """Handles choked (sonic) vs subsonic leakage through the bowl drain hole."""
-        if self.drain_valve_closed or P_in_pa <= P_atm_pa: 
+        """Calculates the continuous air purge escaping through the restrictor."""
+        
+        # SAFETY CHECK: No leaking if valve is closed OR if system is in a vacuum!
+        if self.drain_valve_closed or P_in_pa <= P_atm_pa:
             return 0.0 
             
         pr = P_atm_pa / P_in_pa
         gamma = 1.4
-        critical_ratio = (2 / (gamma + 1)) ** (gamma / (gamma - 1))
+        critical_ratio = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
         
+        # Calculate Mass Flow Rate leaking through the equivalent restrictor area
         if pr <= critical_ratio:
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1)))
+            # Choked (Sonic) Flow
+            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
         else:
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2 * gamma / (gamma - 1)) / (self.R_air * T_in_k) * (pr ** (2/gamma) - pr ** ((gamma + 1)/gamma)))
-        
+            # Subsonic Flow
+            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2.0 * gamma / (gamma - 1.0)) / (self.R_air * T_in_k) * (pr ** (2.0/gamma) - pr ** ((gamma + 1.0)/gamma)))
+            
         return m_dot_leak
 
     def calculate_filter_state(self, m_dot_kg_s, P_in_pa, T_in_k, P_atm_pa=101325.0):
@@ -86,7 +120,7 @@ class SMC_AF20_Filter:
         """
         # If no flow and tank is empty, exit cleanly
         if m_dot_kg_s <= 1e-7 and P_in_pa <= P_atm_pa:
-            return P_in_pa, 0.0, 0.0, 0.0, 0.0, 0.0
+            return P_in_pa, 0.0, 0.0, 0.0, 0.0
 
         # 1. Calculate live operational state properties
         mu = self._get_sutherland_viscosity(T_in_k)

@@ -20,7 +20,7 @@ class SMC_AKH10_NRV:
         """
         # If there is no forward mass flow, the check valve remains closed
         if m_dot_kg_s <= 0.00001:
-            return P_in_pa / 100000.0, 0.0
+            return P_in_pa / 100000.0, 0.0, T_in_k  # Return inlet pressure as outlet, zero drop, and unchanged temperature
 
         P_in_bar = P_in_pa / 100000.0
         rho_anr_dm3 = self.rho_anr / 1000.0
