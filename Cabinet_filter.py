@@ -51,12 +51,12 @@ def calculate_filter_pressure_drop(flow_rate_cfm, width_mm=91.0, height_mm=91.0)
 # ==========================================
 # Input your known Flow Rate here
 # ==========================================
-my_flow_rate_cfm = 25.0  # Example: 25 CFM
+# my_flow_rate_cfm = 25.0  # Example: 25 CFM
 
-# Calculate and print the result
-pressure_drop = calculate_filter_pressure_drop(my_flow_rate_cfm)
+# # Calculate and print the result
+# pressure_drop = calculate_filter_pressure_drop(my_flow_rate_cfm)
 
-print(f"Flow Rate: {my_flow_rate_cfm} CFM")
-print(f"Estimated Pressure Drop: {pressure_drop:.2f} Pascals")
-# Note: To convert Pascals to mmH2O (a common fan spec), divide by 9.806
-print(f"Equivalent in mmH2O: {(pressure_drop / 9.806):.2f} mmH2O")
+# print(f"Flow Rate: {my_flow_rate_cfm} CFM")
+# print(f"Estimated Pressure Drop: {pressure_drop:.2f} Pascals")
+# # Note: To convert Pascals to mmH2O (a common fan spec), divide by 9.806
+# print(f"Equivalent in mmH2O: {(pressure_drop / 9.806):.2f} mmH2O")

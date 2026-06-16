@@ -60,12 +60,12 @@ class ZF111_HEPA_Filter:
             print(f"WARNING: {self.component_name} media fractured due to excess suction pulse!")
 
 # --- Unit Test ---
-if __name__ == "__main__":
-    hepa = ZF111_HEPA_Filter()
+# if __name__ == "__main__":
+#     hepa = ZF111_HEPA_Filter()
     
-    print(f"Testing {hepa.component_name} Model:")
-    test_flows = [15, 30, 60, 90, 100]
+#     print(f"Testing {hepa.component_name} Model:")
+#     test_flows = [15, 30, 60, 90, 100]
     
-    for q in test_flows:
-        dp = hepa.pressure_drop(q)
-        print(f"Flow: {q:3} L/min | Resistance: {dp:.2f} Pa")
+#     for q in test_flows:
+#         dp = hepa.pressure_drop(q)
+#         print(f"Flow: {q:3} L/min | Resistance: {dp:.2f} Pa")

@@ -21,7 +21,7 @@ class SMC_AF20_Filter:
         # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
         # ---------------------------------------------------------
         d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
-        d2_restrictor_m = .50 / 1000.0  # Added pipe restrictor
+        d2_restrictor_m = 0.70 / 1000.0  # Added pipe restrictor
         
         A1 = math.pi * (d1_bowl_m / 2.0)**2
         A2 = math.pi * (d2_restrictor_m / 2.0)**2

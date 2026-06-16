@@ -10,6 +10,12 @@ import water_separater as ws
 import mist_separator as ms
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+# import Silencer as sl
+# import Hepa as hp
+# import Cabinet_filter as cf
+
+
+
 
 # ==========================================
 # 1. THE PID CONTROLLER
@@ -282,6 +288,10 @@ if __name__ == "__main__":
     Air_filter = af.SMC_AF20_Filter()
     Water_sep = ws.SMC_AFG20_WaterSeparator()
     Mist_sep = ms.SMC_AFM20_MistSeparator()
+    # Silencer = sl.AcousticSilencerChamber()
+    # Hepa = hp.ZF111_HEPA_Filter()
+    # Cabinet_filter = cf.calculate_filter_pressure_drop()    
+
     # Air_filter = af.SMC_AF20_Filter(valve_closed= True  )  # Simulating the unvalved 1.8mm leak
     # Water_sep = ws.SMC_AFG20_WaterSeparator(valve_closed= True  )  # Simulating the unvalved 1.8mm leak
     # Mist_sep = ms.SMC_AFM20_MistSeparator(valve_closed= True  )  # Simulating the unvalved 1.8mm leak
@@ -294,13 +304,16 @@ if __name__ == "__main__":
     comp.temp_motor_k = temp_room_k
     comp.temp_head_k = temp_room_k
 
+    # We need to track the compressor's suction mass flow to feed the filters
+    # actual_intake_m_dot_kg_s = 0.0
+
     dt_s = 0.01
 
     tank = dt.SmartCompressorTankTwin(
         volume_liters=2.0,
         motor_voltage_v=24.0
     )
-    total_time_s = 6000
+    total_time_s = 600
     time = np.arange(0, total_time_s, dt_s)
 
     # =================================================================
@@ -339,6 +352,7 @@ if __name__ == "__main__":
 
         # print(p_tank_gauge)
         p_tank_abs_pa = (p_tank_gauge * 100000.0) + 101325.0
+
 
 
 
@@ -464,9 +478,6 @@ if __name__ == "__main__":
         # if t % 2.0 < dt_s:  
         #     print(f"Time: {t:.2f} s | Tank Pres: {p_tank_gauge:.2f} Bar | Flow In: {q_nlpm_mist:.1f} NLPM | Blower: {current_blower_cfm:.1f} CFM | Head Temp: {temp_head_k - 273.15:.1f} °C")
 
-
-
-
 print("Generating Interactive Dashboard...")
 
 fig = make_subplots(
@@ -554,12 +565,9 @@ fig.update_layout(
 fig.update_xaxes(title_text="Time (Seconds)", row=5, col=1)
 fig.update_yaxes(range=[0, 105], row=5, col=1)
 
+fig.show()
 
 
-
-
-# fig.show()
-# Replaces fig.show()
-print("Saving dashboard to 'Digital_Twin_Dashboard.html'...")
-fig.write_html("Digital_Twin_Dashboard.html")
-print("Done! Open the HTML file in your folder to view it.")
+# print("Saving dashboard to 'Digital_Twin_Dashboard.html'...")
+# fig.write_html("Digital_Twin_Dashboard.html")
+# print("Done! Open the HTML file in your folder to view it.")
