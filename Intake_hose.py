@@ -117,7 +117,7 @@ class IntakeHose_HiPoFlex:
 # =====================================================================
 # if __name__ == "__main__":
 #     # Initialize the finalized hose module
-#     hose = DischargeHose_HiPoFlex()
+#     hose = IntakeHose_HiPoFlex()
     
 #     # Simulating the air leaving the compressor head
 #     test_m_dot = 0.002           # approx 90  NLPM flow
