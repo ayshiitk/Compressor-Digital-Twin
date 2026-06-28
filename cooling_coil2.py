@@ -1,7 +1,5 @@
 import math
 
-from fluids import Dean
-
 class CopperCoolingCoil_TwinFan:
     """
     Component Model: Helical Copper Cooling Coil wrapped around a tank
@@ -98,26 +96,17 @@ class CopperCoolingCoil_TwinFan:
 
         # Existing code:
         U_out = 1.0 / ((1.0 / h_out) + (self.D_out / (self.D_in * h_in)))
-        # Overall thermal resistance based on outer surface area (neglecting copper wall resistance)
-        U_out = 1.0 / ((1.0 / h_out) + (self.D_out / (self.D_in * h_in)))
         UA_per_meter = U_out * math.pi * self.D_out
         
         # --- Task 1: Find Required Length for 1°C Approach ---
         if T_in_k <= T_target_out_k:
-            return T_in_k - 273.15, T_amb_k - 273.15, P_in_pa  # No cooling needed; return inputs as outputs
+            return T_in_k, T_amb_k - 273.15, P_in_pa  # No cooling needed; return inputs as outputs
           
-            # raise ValueError("Inlet temperature must be greater than target outlet temperature for cooling to occur.")  
-        
-        # In cooling_coil.py, analyze_coil(), replace line 107 onward:
         C_min = m_dot_kg_s * self.cp_air
         if C_min < 1e-6:   # ← ADD THIS GUARD
-            return T_in_k - 273.15, T_amb_k - 273.15, P_in_pa
+            return T_in_k, T_amb_k, P_in_pa
 
         NTU_req = -math.log(target_approach / (T_in_k - T_amb_k))
-        
-        
-        # C_min = m_dot_kg_s * self.cp_air
-        # NTU_req = -math.log(target_approach / (T_in_k - T_amb_k))
         L_required = (NTU_req * C_min) / UA_per_meter
         
         # --- Task 2: Evaluate Performance based on Selected Length ---
@@ -136,55 +125,26 @@ class CopperCoolingCoil_TwinFan:
         delta_T_ambient = watts_extracted / (m_dot_ambient * self.cp_air)
         T_ambient_out_celsius = (T_amb_k + delta_T_ambient) - 273.15
         
-        # Friction Factor with Coiled Helical Correction
+        # Friction Factor with Coiled Helical Correction (UPDATED)
         f_straight = 0.316 / (Re_in**0.25) if Re_in > 4000 else 64.0 / Re_in
-        f_coiled = f_straight * (1.0 + 0.11 * (Dean**0.49))
+        f_coiled = f_straight * (1.0 + 0.2425 * (Dean**0.2370)) # <-- Replaced 0.11 and 0.49
         
         # Pressure Drop calculation
         delta_p_pa = f_coiled * (L_eval / self.D_in) * (0.5 * rho_in * v_in**2)
         
         # Actual absolute outlet pressure of compressed gas
         P_out_pa = P_in_pa - delta_p_pa
-        P_out_bar = P_out_pa / 100000.0  # Convert to Bar absolute
-        
-        excess_length = L_eval - L_required if selected_length is not None else 0.0
-        
-        # return {
-        #     "L_required_meters": L_required,
-        #     "T_final_celsius": T_final_k - 273.15,
-        #     "T_ambient_out_celsius": T_ambient_out_celsius,
-        #     "pressure_drop_mbar": delta_p_pa / 100.0,
-        #     "P_out_bar": P_out_bar,
-        #     "excess_length_meters": excess_length
-        # }
-
-        return T_final_k - 273.15, T_ambient_out_celsius, P_out_pa, delta_p_pa, m_dot_kg_s/self.rho_ambient*60.0*1000.0, Re_in, Dean
-        # return T_final_k - 273.15, T_ambient_out_celsius, P_out_pa
+        return T_final_k, T_ambient_out_celsius, P_out_pa
+        # return T_final_k, T_ambient_out_celsius, P_out_pa, delta_p_pa, m_dot_kg_s/self.rho_ambient*60.0*1000.0, Re_in, Dean
+    
 
 # =====================================================================
 # SYSTEM EVALUATION
 # =====================================================================
 if __name__ == "__main__":
-    # coil_solver = CopperCoolingCoil_TwinFan()
-    
-    # # Boundary Conditions arriving from the previous discharge hose state
-    # mass_flow = 0.001         # 50 NLPM
-    # pressure_inlet = 3.5e5    # ~3.98 Bar absolute (accounting for hose drop)
-    # temperature_inlet = 273.15 + 93.5 # 93.5°C entering from the silicone hose
-    # ambient_room = 273.15 + 25.0 # 25°C Room Air
-    
-    # # SCENARIO A: Calculate what the system mathematically needs
-    # ideal_results = coil_solver.analyze_coil(mass_flow, pressure_inlet, temperature_inlet, ambient_room)
-    # print("=== IDEAL COOLING COIL PERFORMANCE ===")
-    # print(f"Final temp : {ideal_results[0]:.3f}")     
-    # print(f"Final Gas Temperature (°C) : {ideal_results[1]:.2f}")
-    # print(f"output pressure: {ideal_results[2]:.2f}")      
-    # print(f"Pressure Drop : {ideal_results[3]:.2f}")  
-    # print(f"flowrate  : {ideal_results[4]:.2f}")  
-
     coil_solver = CopperCoolingCoil_TwinFan()
 
-# (Flow in SLPM, Inlet Pressure in BAR GAUGE)
+    # (Flow in SLPM, Inlet Pressure in BAR GAUGE)
     test_points = [
         (99.2, 0.40),
         (81.4, 1.86),
@@ -200,9 +160,9 @@ if __name__ == "__main__":
     rho_std = 1.293                        # kg/m³ at STP
     P_atm_bar = 1.01325                    # Atmospheric pressure
 
-    print("-"*110)
+    print("-" * 110)
     print(f"{'Flow':>8} {'Pin(g)':>10} {'Pin(abs)':>10} {'Pout(abs)':>12} {'ΔP':>10} {'Tout':>10} {'Re':>10} {'Dean':>10}") 
-    print("-"*110)
+    print("-" * 110)
 
     for flow_slpm, pin_gauge_bar in test_points:
 
@@ -226,9 +186,9 @@ if __name__ == "__main__":
         dP_bar = dP_pa / 1e5
 
         print(f"{flow_slpm:8.1f}"
-            f"{pin_gauge_bar:10.2f}"
-            f"{pin_abs_bar:10.3f}"
-            f"{Pout_abs_bar:12.3f}"
-            f"{dP_bar:10.4f}"
-            f"{Re_in:10.2f}"
-            f"{Dean :10.2f}")
+              f"{pin_gauge_bar:10.2f}"
+              f"{pin_abs_bar:10.3f}"
+              f"{Pout_abs_bar:12.3f}"
+              f"{dP_bar:10.4f}"
+              f"{Re_in:10.2f}"
+              f"{Dean :10.2f}")

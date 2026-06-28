@@ -15,7 +15,8 @@ class SMC_AFG20_WaterSeparator:
         self.Q_max_nlpm = 1000.0        # Max air flow capacity: 1,000 l/min (ANR)
         self.Q_activation_nlpm = 15.0   # Flow needed to spin the vortex effectively
         self.k_shape = 2.0       
-        self.beta_inertial = 8.5e7 
+        # self.beta_inertial = 8.5e7 
+        self.beta_inertial = 2.78e9   # calibrated from 90 SLPM measured point
         
         # Leakage Configuration ("J" Option)
         self.drain_valve_closed = valve_closed 
@@ -27,15 +28,19 @@ class SMC_AFG20_WaterSeparator:
         # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
         # ---------------------------------------------------------
         d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
-        d2_restrictor_m = 0.70 / 1000.0  # Added pipe restrictor
+        d2_restrictor_m = 1.0 / 1000.0  # Added pipe restrictor
         
         A1 = math.pi * (d1_bowl_m / 2.0)**2
         A2 = math.pi * (d2_restrictor_m / 2.0)**2
         
         # Calculate the equivalent aerodynamic area of both holes in series
-        self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
+        # self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
+        # self.drain_hole_area_m2 = A2
+
+        A_theoretical =  2.165e-7
+        self.drain_hole_area_m2 = A_theoretical
         
-        self.Cd_drain = 0.62  # Standard discharge coefficient
+        self.Cd_drain = 1 # Standard discharge coefficient
  
 
     def _calculate_condensation(self, T_amb_C, RH_amb, P_amb_pa, T_coil_C, P_coil_pa, m_dot_total_kg_s):
@@ -147,7 +152,7 @@ class SMC_AFG20_WaterSeparator:
             
         return m_dot_leak
 
-    def update_state(self, m_dot_in_kg_s, P_in_pa, T_in_k, T_amb_C, RH_amb, P_amb_pa=101325.0):
+    def update_state(self, t, m_dot_in_kg_s, P_in_pa, T_in_k, T_amb_C, RH_amb, P_amb_pa=101325.0):
         """
         Master update function. Feed it the compressor output and room weather, 
         and it handles condensation, leakage, flow rates, and water separation.
@@ -171,6 +176,10 @@ class SMC_AFG20_WaterSeparator:
             
         P_bowl_pa = max(0.0, P_in_pa - dp_inertial)
         m_dot_leak_kg_s = self._calculate_leakage(P_bowl_pa, T_in_k, P_amb_pa)
+        leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
+        if t % 100 ==0:
+            print(f"Leakage Mass Flow_nlpm_water: {leak_nlpm:.6f} nlpm at P_out_water: {P_bowl_pa/100000:.3f} Bar abs, T_in_water: {T_in_k-273.15:.1f} °C")
+
         m_dot_effective = max(0.0, m_dot_in_kg_s - m_dot_leak_kg_s)
         
         # 3. CENTRIFUGAL WATER SEPARATION

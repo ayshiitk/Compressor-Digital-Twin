@@ -16,6 +16,8 @@ class ZF111_HEPA_Filter:
         # Including (0,0) as a physical baseline
         self.known_flows_lpm = np.array([0, 30, 60, 90])
         self.known_resistance_pa = np.array([0, 71, 1120, 3236])
+        # self.known_flows_lpm       = np.array([0,  30,   50,   60,   70,   85,   100])
+        # self.known_resistance_pa   = np.array([0, 2000, 3000, 4000, 5000, 6000, 6000])
         
         # Generate 2nd-order polynomial coefficients [C1, C2, C3]
         self.flow_curve_coeffs = np.polyfit(self.known_flows_lpm, self.known_resistance_pa, 2)
@@ -23,7 +25,7 @@ class ZF111_HEPA_Filter:
         # State variables
         self.loading = 0.0          # 0.0 = New, 1.0 = Clogged
         self.is_fractured = False
-        self.clog_rate = 1e-6       # Arbitrary loading increment per time-step
+        self.clog_rate = 1e-7       # Arbitrary loading increment per time-step
         
         # Reciprocating pump suction pulse threshold (Pa gauge)
         self.fracture_threshold_pa = 5000 
@@ -60,12 +62,12 @@ class ZF111_HEPA_Filter:
             print(f"WARNING: {self.component_name} media fractured due to excess suction pulse!")
 
 # --- Unit Test ---
-# if __name__ == "__main__":
-#     hepa = ZF111_HEPA_Filter()
+if __name__ == "__main__":
+    hepa = ZF111_HEPA_Filter()
     
-#     print(f"Testing {hepa.component_name} Model:")
-#     test_flows = [15, 30, 60, 90, 100]
+    print(f"Testing {hepa.component_name} Model:")
+    test_flows = [15, 30, 60, 90, 100]
     
-#     for q in test_flows:
-#         dp = hepa.pressure_drop(q)
-#         print(f"Flow: {q:3} L/min | Resistance: {dp:.2f} Pa")
+    for q in test_flows:
+        dp = hepa.pressure_drop(q)
+        print(f"Flow: {q:3} L/min | Resistance: {dp:.2f} Pa")

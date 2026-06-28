@@ -8,7 +8,7 @@ class SMC_AF20_Filter:
     Features an integrated Cramer's Rule solver to dynamically compute 
     viscous and inertial structural coefficients from raw datasheet coordinates.
     """
-    def __init__(self, point1_lpm = 300, point1_dp_mbar = 200, point2_lpm = 600, point2_dp_mbar = 700, p_cal_gauge_mpa=0.3, valve_closed=False):
+    def __init__(self, point1_lpm = 300, point1_dp_mbar = 200, point2_lpm = 600, point2_dp_mbar = 700, p_cal_gauge_mpa=0.25, valve_closed=False):
         # Universal Constants
         self.R_air = 287.05               # Specific gas constant for air (J/kg*K)
         self.rho_anr = 1.204              # Standard air density baseline (kg/m3)
@@ -21,15 +21,18 @@ class SMC_AF20_Filter:
         # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
         # ---------------------------------------------------------
         d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
-        d2_restrictor_m = 0.70 / 1000.0  # Added pipe restrictor
+        d2_restrictor_m = 1.0 / 1000.0  # Added pipe restrictor
         
         A1 = math.pi * (d1_bowl_m / 2.0)**2
         A2 = math.pi * (d2_restrictor_m / 2.0)**2
+       
         
         # Calculate the equivalent aerodynamic area of both holes in series
-        self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
-        
-        self.Cd_drain = 0.62  # Standard discharge coefficient
+        # self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
+        A_theoretical =  2.165e-7
+        self.drain_hole_area_m2 = A_theoretical
+
+        self.Cd_drain = 1  # Standard discharge coefficient
 
         # Self-Calibrate coefficients from chart anchor inputs
         self.alpha_viscous, self.beta_inertial = self._execute_factory_calibration(
@@ -113,7 +116,7 @@ class SMC_AF20_Filter:
             
         return m_dot_leak
 
-    def calculate_filter_state(self, m_dot_kg_s, P_in_pa, T_in_k, P_atm_pa=101325.0):
+    def calculate_filter_state(self, t , m_dot_kg_s, P_in_pa, T_in_k, P_atm_pa=101325.0):
         """
         Evaluates current flow criteria to output total component pressure drop,
         leakage mass flow, and downstream delivery mass flow/pressure.
@@ -138,12 +141,15 @@ class SMC_AF20_Filter:
 
         # 3. Calculate bowl leakage (driven by the pressure after the element drop)
         m_dot_leak_kg_s = self._calculate_leakage(P_out_pa, T_in_k, P_atm_pa)
+        leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
+        if t % 100 ==0:
+            print(f"Leakage Mass Flow_nlpm: {leak_nlpm:.6f} kg/s at P_out: {P_out_pa/100000:.3f} Bar abs, T_in: {T_in_k-273.15:.1f} °C")
 
         # 4. Calculate actual surviving mass flow to send downstream
         m_dot_out_kg_s = max(0.0, m_dot_kg_s - m_dot_leak_kg_s)
 
         return P_out_pa, total_dp_mbar, dp_viscous_pa / 100.0, dp_inertial_pa / 100.0, m_dot_out_kg_s
-
+        # return P_out_pa, total_dp_mbar, dp_viscous_pa / 100.0, dp_inertial_pa / 100.0, m_dot_out_kg_s, m_dot_leak_kg_s
 
 # =====================================================================
 # CALIBRATED PERFORMANCE RUNNER

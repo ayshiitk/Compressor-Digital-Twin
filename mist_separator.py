@@ -32,15 +32,18 @@ class SMC_AFM20_MistSeparator:
         # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
         # ---------------------------------------------------------
         d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
-        d2_restrictor_m = 0.70 / 1000.0  # Added pipe restrictor
+        d2_restrictor_m = 1.0 / 1000.0  # Added pipe restrictor
         
         A1 = math.pi * (d1_bowl_m / 2.0)**2
         A2 = math.pi * (d2_restrictor_m / 2.0)**2
         
         # Calculate the equivalent aerodynamic area of both holes in series
-        self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
-        
-        self.Cd_drain = 0.62  # Standard discharge coefficient
+        # self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
+
+        A_theoretical =  2.165e-7
+        self.drain_hole_area_m2 = A_theoretical
+        # self.drain_hole_area_m2 = A2
+        self.Cd_drain = 1  # Standard discharge coefficient
 
     # def calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
     #     """
@@ -89,7 +92,7 @@ class SMC_AFM20_MistSeparator:
         Dynamically scales across the 1 Bar to 7 Bar operating range.
         """
         # 1. Base pressure drop at the SMC 0.3 MPa (4 Bar Absolute) reference
-        dp_dry_base = 100.0 * Q_nlpm + 0.2 * (Q_nlpm ** 2)
+        dp_dry_base = 36 * Q_nlpm + 0.073 * (Q_nlpm ** 2)
         dp_wet_max = 400.0 * Q_nlpm  # Max theoretical water blockage
         
         # Aerodynamic clearing: high flow violently blows water out of the pores (k = 0.015)
@@ -140,7 +143,7 @@ class SMC_AFM20_MistSeparator:
     #         "water_escaped_mg_s": water_escaped_mg_s
     #     }
     
-    def update_state(self, m_dot_in_kg_s, P_in_pa, T_in_k, aerosol_water_in_mg_s, dt_seconds):
+    def update_state(self,t , m_dot_in_kg_s, P_in_pa, T_in_k, aerosol_water_in_mg_s, dt_seconds):
         """
         Processes a single simulation time step through the Mist Separator node.
         """
@@ -154,6 +157,10 @@ class SMC_AFM20_MistSeparator:
         
         # 2. Leakage Check (Bleeds from the bowl at downstream pressure)
         m_dot_leak_kg_s = self.calculate_leakage(P_bowl_pa, T_in_k)
+        leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
+        if t % 100 ==0:
+            print(f"Leakage Mass Flow_nlpm_mist: {leak_nlpm:.6f} nlpm at P_out_mist: {P_bowl_pa/100000:.3f} Bar abs, T_in_mist: {T_in_k-273.15:.1f} °C")
+
         
         # 3. Effective Output Mass Flow (What survives to the patient)
         m_dot_effective = max(0.0, m_dot_in_kg_s - m_dot_leak_kg_s)
@@ -171,7 +178,7 @@ class SMC_AFM20_MistSeparator:
         
         q_nlpm = (m_dot_effective / 1.204) * 60000.0
 
-        return P_bowl_pa, dp_pa, q_nlpm, water_escaped_mg_s
+        return P_bowl_pa, dp_pa, m_dot_effective, water_escaped_mg_s
         # return {
         #     "P_out_pa": P_bowl_pa,
         #     "dp_pa": dp_pa,
