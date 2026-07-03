@@ -177,8 +177,8 @@ class SMC_AFG20_WaterSeparator:
         P_bowl_pa = max(0.0, P_in_pa - dp_inertial)
         m_dot_leak_kg_s = self._calculate_leakage(P_bowl_pa, T_in_k, P_amb_pa)
         leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
-        if t % 100 ==0:
-            print(f"Leakage Mass Flow_nlpm_water: {leak_nlpm:.6f} nlpm at P_out_water: {P_bowl_pa/100000:.3f} Bar abs, T_in_water: {T_in_k-273.15:.1f} °C")
+        # if t % 100 ==0:
+        #     print(f"Leakage Mass Flow_nlpm_water: {leak_nlpm:.6f} nlpm at P_out_water: {P_bowl_pa/100000:.3f} Bar abs, T_in_water: {T_in_k-273.15:.1f} °C")
 
         m_dot_effective = max(0.0, m_dot_in_kg_s - m_dot_leak_kg_s)
         

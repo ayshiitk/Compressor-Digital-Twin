@@ -54,7 +54,7 @@ class SmartCompressorTankTwin:
         self.last_actual_inflow_nlpm = 0.0   # What the FULL pneumatic chain actually delivered last step
         self.power_saving_pwm = 1.0          # Persistent PWM command while in POWER_SAVING
         self.flow_error_integral = 0.0       # Integral of (demand - actual) while in POWER_SAVING
-        self.ki_flow = 0.0006                # Integral gain (NLPM error -> PWM fraction). Tune if needed.
+        self.ki_flow = 0.006                # Integral gain (NLPM error -> PWM fraction). Tune if needed.
         self._prev_control_state = "MAX_RECOVERY"
 
     def get_pump_metrics(self, p_gauge_bar):
@@ -75,12 +75,12 @@ class SmartCompressorTankTwin:
         # 1. Evaluate State Transitions
         if p_gauge_bar <= 1.5:
             self.control_state = "MAX_RECOVERY"
-        elif p_gauge_bar >= 3.0:
+        elif p_gauge_bar >= 4.0:
             self.control_state = "COAST_DOWN"
 
-        if self.control_state == "MAX_RECOVERY" and p_gauge_bar >= 2.6:
+        if self.control_state == "MAX_RECOVERY" and p_gauge_bar >= 2.8:
             self.control_state = "POWER_SAVING"
-        elif self.control_state == "COAST_DOWN" and p_gauge_bar <= 2.6:
+        elif self.control_state == "COAST_DOWN" and p_gauge_bar <= 2.8:
             self.control_state = "POWER_SAVING"
 
         # 2. Detect a FRESH entry into POWER_SAVING and (re)seed the controller.
@@ -256,7 +256,7 @@ class SmartCompressorTankTwin:
     #     return p_tank_gauge, current_pwm, actual_inflow_nlpm, q_vent_actual
     
 
-    def simulate(self, t, T_in_K, dt_s, t_insp, flow_insp, t_exp, flow_exp, external_inflow_nlpm=None):
+    def simulate(self,t, T_in_K, dt_s, t_insp, flow_insp, t_exp, flow_exp, external_inflow_nlpm=None):
         cycle_time = t_insp + t_exp
         avg_demand_nlpm = ((t_insp * flow_insp) + (t_exp * flow_exp)) / cycle_time
 
@@ -278,7 +278,7 @@ class SmartCompressorTankTwin:
         current_pwm = self.calculate_controller_pwm(p_tank_gauge, avg_demand_nlpm)
 
         if external_inflow_nlpm is not None:
-            actual_inflow_nlpm = external_inflow_nlpm
+            actual_inflow_nlpm  = external_inflow_nlpm
         else:
             max_flow, _ = self.get_pump_metrics(p_tank_gauge)
             actual_inflow_nlpm = current_pwm * max_flow
@@ -289,7 +289,7 @@ class SmartCompressorTankTwin:
             q_vent_actual = q_vent_demand_nlpm
 
         # 2. Fix the Mass Flow Unit Mismatch (Both must be strictly kg/s)
-        m_dot_in_kg_s = actual_inflow_nlpm
+        m_dot_in_kg_s = ( actual_inflow_nlpm/1000.0/60.0) * self.rho_normal
         m_dot_out_kg_s = (q_vent_actual / 1000.0 / 60.0) * self.rho_normal
 
         # 3. CONSERVATION OF ENERGY (First Law of Thermodynamics)

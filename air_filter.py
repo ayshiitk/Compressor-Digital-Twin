@@ -116,7 +116,7 @@ class SMC_AF20_Filter:
             
         return m_dot_leak
 
-    def calculate_filter_state(self, t , m_dot_kg_s, P_in_pa, T_in_k, P_atm_pa=101325.0):
+    def calculate_filter_state(self, t,  m_dot_kg_s, P_in_pa, T_in_k, P_atm_pa=101325.0):
         """
         Evaluates current flow criteria to output total component pressure drop,
         leakage mass flow, and downstream delivery mass flow/pressure.
@@ -142,8 +142,8 @@ class SMC_AF20_Filter:
         # 3. Calculate bowl leakage (driven by the pressure after the element drop)
         m_dot_leak_kg_s = self._calculate_leakage(P_out_pa, T_in_k, P_atm_pa)
         leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
-        if t % 100 ==0:
-            print(f"Leakage Mass Flow_nlpm: {leak_nlpm:.6f} kg/s at P_out: {P_out_pa/100000:.3f} Bar abs, T_in: {T_in_k-273.15:.1f} °C")
+        # if t % 100 ==0:
+        #     print(f"Leakage Mass Flow_nlpm: {leak_nlpm:.6f} kg/s at P_out: {P_out_pa/100000:.3f} Bar abs, T_in: {T_in_k-273.15:.1f} °C")
 
         # 4. Calculate actual surviving mass flow to send downstream
         m_dot_out_kg_s = max(0.0, m_dot_kg_s - m_dot_leak_kg_s)

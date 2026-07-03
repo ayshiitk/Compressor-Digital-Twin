@@ -55,23 +55,15 @@ class ThermalPIDController:
 # ==========================================
 # 2. THE SUNON FAN TRANSLATOR
 # ==========================================
-blower_pwm_data = np.array([0, 25, 40, 50, 60, 67, 77, 85, 100])
-blower_rpm_data = np.array([1250, 2275, 2885, 3355, 3960, 4850, 5750, 6250, 6820])
-blower_rpm_fit  = np.polyfit(blower_pwm_data, blower_rpm_data, 2)
-
 def get_cfm_from_pwm(pwm_percentage):
-    rpm = np.polyval(blower_rpm_fit, pwm_percentage)
-    return (rpm / 6820.0) * 53.6*2
-
-# def get_cfm_from_pwm(pwm_percentage):
-#     """
-#     Translates PWM% to CFM based on the SUNON PF97332BX datasheet.
-#     0% PWM = 1200 RPM. 100% PWM = 6800 RPM. Max CFM = 53.6.
-#     """
-#     rpm = 1200.0 + (pwm_percentage / 100.0) * (6800.0 - 1200.0)
-#     # Assuming linear scaling of flow with RPM for a fixed static system
-#     actual_cfm = (rpm / 6800.0) * 53.6
-#     return actual_cfm
+    """
+    Translates PWM% to CFM based on the SUNON PF97332BX datasheet.
+    0% PWM = 1200 RPM. 100% PWM = 6800 RPM. Max CFM = 53.6.
+    """
+    rpm = 1200.0 + (pwm_percentage / 100.0) * (6800.0 - 1200.0)
+    # Assuming linear scaling of flow with RPM for a fixed static system
+    actual_cfm = (rpm / 6800.0) * 53.6
+    return actual_cfm
 
 class SmartCompressor_120RND:
     """
@@ -83,36 +75,8 @@ class SmartCompressor_120RND:
     mechanical motor efficiency, ensuring highly accurate heat generation predictions.
     """
     
-    def __init__(self, pump_model="120RND"):
-
-        self.pump_model = pump_model
-        
-        if self.pump_model == "120RND":
-            self.component_name = "120RND-ED Empirical Compressor"
-            
-            # --- RAW EMPIRICAL DATA (From 120RND.csv at 100% PWM) ---
-            self.raw_pressure_bar = np.array([0.14, 0.5, 1.0, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.5, 4.0, 4.5, 5.25, 6.25])
-            self.raw_flow_nlpm = np.array([100.35, 95.8, 90.0, 82.5, 79.0, 76.0, 72.5, 69.5, 67.0, 64.0, 59.5, 56.0, 54.0, 49.5, 46.0])
-            self.raw_current_amps = np.array([10.5, 13.2, 16.2, 18.3, 19.0, 19.8, 20.3, 20.7, 21.2, 21.6, 22.2, 22.5, 22.8, 23.0, 22.8])
-            
-            # Thermal Mass Estimations
-            self.Cth_motor = 1513.4  
-            self.Cth_head = 1413.0   
-            
-        elif self.pump_model == "140RND":
-            self.component_name = "140RND-ED Empirical Compressor"
-            
-            # --- RAW EMPIRICAL DATA (From 140 RND .csv at 100% PWM) ---
-            self.raw_pressure_bar = np.array([0.18, 0.5, 1.0, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.5, 4.0, 4.5, 5.25, 6.25])
-            self.raw_flow_nlpm = np.array([112.0, 104.0, 94.0, 85.5, 82.3, 79.3, 76.5, 73.5, 71.0, 68.4, 64.5, 60.5, 57.0, 52.0, 48.0])
-            self.raw_current_amps = np.array([15.0, 16.8, 18.9, 20.6, 21.4, 22.0, 22.6, 23.1, 23.6, 24.1, 24.7, 25.1, 25.4, 25.6, 25.4])
-            
-            # Thermal Mass Estimations
-            self.Cth_motor = 1650.0  
-            self.Cth_head = 1550.0
-            
-        else:
-            raise ValueError("Invalid pump model selected. Choose '120RND' or '140RND'.")
+    def __init__(self):
+        self.component_name = "120RND-ED Empirical Compressor"
         
         # =====================================================================
         # PHYSICAL SYSTEM CONSTANTS
@@ -122,12 +86,12 @@ class SmartCompressor_120RND:
         self.cp_air = 1005.0          # Specific heat of air at constant pressure (J/kg·K)
         
         # Thermal Capacitance (Mass * Specific Heat) in Joules/Kelvin
-        # self.Cth_motor = 1513.4       # Blended mass of Steel casing + Copper Stator
-        # self.Cth_head = 4000.0        # Mass of AL6061 and ADC12 Aluminum Heads
+        self.Cth_motor = 1513.4       # Blended mass of Steel casing + Copper Stator
+        self.Cth_head = 1413.0        # Mass of AL6061 and ADC12 Aluminum Heads
         
         # Safety Throttling Limits (Kelvin)
         self.motor_limit_k = 273.15 + 75.0          # Absolute max safe temp (75°C)
-        self.motor_throttle_start_k = 273.15 + 70.0 # Start reducing power here (70°C)
+        self.motor_throttle_start_k = 273.15 + 65.0 # Start reducing power here (65°C)
 
         # Dynamic State Variables (Initialize at Room Temperature)
         self.temp_air = 40 + 273.15
@@ -135,14 +99,14 @@ class SmartCompressor_120RND:
         self.temp_head_k = 40 + 273.15  # Heads start cooler due to direct contact with incoming air
 
         # =====================================================================
-        # PNEUMATIC MANUFACTURER CURVES (Flow & Current vs. Pressure) | 120 RND 
+        # PNEUMATIC MANUFACTURER CURVES (Flow & Current vs. Pressure)
         # =====================================================================
-        # pressure_points_bar = np.array([0, 1, 2, 3, 4, 5, 6, 7])
-        # flow_points_nlpm = np.array([133, 121, 108, 90, 79, 67, 60, 52])
-        # current_points_amps = np.array([9.9, 16.1, 20.8, 22.9, 24.0, 24.5, 24.9, 24.5])
+        pressure_points_bar = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        flow_points_nlpm = np.array([133, 121, 108, 90, 79, 67, 60, 52])
+        current_points_amps = np.array([9.9, 16.1, 20.8, 22.9, 24.0, 24.5, 24.9, 24.5])
         
-        self.flow_curve = np.polyfit( self.raw_pressure_bar, self.raw_flow_nlpm, 2)
-        self.current_curve = np.polyfit(self.raw_pressure_bar, self.raw_current_amps, 3)
+        self.flow_curve = np.polyfit(pressure_points_bar, flow_points_nlpm, 2)
+        self.current_curve = np.polyfit(pressure_points_bar, current_points_amps, 3)
 
         # Run the auto-calibration based on the physical test data below
         self._run_empirical_calibration()
@@ -168,16 +132,14 @@ class SmartCompressor_120RND:
         # Wait 15 mins for temps to steady. Record Amps, Room Temp, and Motor Temp.
         # =====================================================================
         test2_motor_pwm = np.array([0.25, 0.50, 0.75, 1.00])
-        test2_amps = np.array([1.0 , 2.20, 4.0, 6.8])        
+        test2_amps = np.array([1, 2.25, 4.05 , 6.8])        
         test2_temp_motor_c = np.array([40.0, 42.0, 44.2, 48.5])     
-        test2_temp_room_c = np.array([33.0, 33.0, 33.0, 33.0])      
+        test2_temp_room_c = np.array([33.0, 33.0, 33.0, 33.0]) 
+        test2_Voltage = np.array([26.1, 26.1, 26.1, 26.05]) 
         
         # Math: I^2R exactly calculates motor heat without guessing efficiency
-        # motor_heat_watts = (test2_amps ** 2) * self.R_coil_hot_ohms
-        # motor_Rth_values = (test2_temp_motor_c - test2_temp_room_c) / motor_heat_watts
-
-        test2_total_power_w = np.array([26.1, 57.42, 104.4, 176.8])  # from P = V_actual × I
-        motor_Rth_values = (test2_temp_motor_c - test2_temp_room_c) / test2_total_power_w
+        motor_heat_watts = (test2_amps ** 2) * self.R_coil_hot_ohms
+        motor_Rth_values = (test2_temp_motor_c - test2_temp_room_c) / motor_heat_watts
         
         # Create a curve so the software knows Rth for ANY requested PWM
         self.motor_Rth_curve = np.polyfit(test2_motor_pwm, motor_Rth_values, 2)
@@ -189,21 +151,12 @@ class SmartCompressor_120RND:
         # different speeds (CFM). Wait 15 mins. Record Head Temp and the ACTUAL 
         # temperature of the air shooting out of the discharge hose.
         # =====================================================================
-        # test3_blower_cfm = np.array([0.0, 18.9, 53.6, 80.0, 107.2])
-        # test3_amps = np.array([24.0, 24.0, 24.0, 24.0, 24.0])        
-        # test3_pressure_bar = np.array([4.0, 4.0, 4.0, 4.0, 4.0])   
-        # test3_temp_head_c = np.array([88.0, 72.0, 54.0, 49.0, 45.0])      
-        # test3_temp_room_c = np.array([40.0, 40.0, 40.0, 40.0, 40.0])       
-        # test3_temp_gas_out_c = np.array([130.0, 112.0, 88.0, 80.0, 75.0])  
-
-        # Blower CFM estimated from Sheet "Blower Characteristics": 100% → 6820 RPM ≈ 53.6 CFM
-        # 80% → ~6250 RPM, scaled → 49 CFM; 65% → ~4850 RPM → 38 CFM
-        test3_blower_cfm    = np.array([38.0, 49.0, 53.6])
-        test3_amps          = np.array([15.33, 15.33, 18.86])     # from FA120 rows 8, 11, 7
-        test3_pressure_bar  = np.array([2.5,   2.5,   2.5])
-        test3_temp_head_c   = np.array([63.5,  65.0,  69.5])      # avg of rear+front
-        test3_temp_room_c   = np.array([27.5,  27.5,  27.5])
-        test3_temp_gas_out_c= np.array([54.0,  54.0,  58.0])      # T_coil_inlet column
+        test3_blower_cfm = np.array([0.0, 18.9, 53.6, 80.0, 107.2])
+        test3_amps = np.array([24.0, 24.0, 24.0, 24.0, 24.0])        
+        test3_pressure_bar = np.array([4.0, 4.0, 4.0, 4.0, 4.0])   
+        test3_temp_head_c = np.array([88.0, 72.0, 54.0, 49.0, 45.0])      
+        test3_temp_room_c = np.array([40.0, 40.0, 40.0, 40.0, 40.0])       
+        test3_temp_gas_out_c = np.array([130.0, 112.0, 88.0, 80.0, 75.0])  
 
         head_Rth_values = np.zeros(len(test3_blower_cfm))
         epsilon_values = np.zeros(len(test3_blower_cfm))
@@ -220,9 +173,7 @@ class SmartCompressor_120RND:
             t_gas_out_k = test3_temp_gas_out_c[i] + 273.15
             
             # 3. Calculate Isentropic Peak Temperature (The theoretical maximum)
-            p_down_abs = (test3_pressure_bar[i] + 1.01325) * 1e5  # Pa absolute
-            p_up_abs   = 1.01325e5                                  # atmospheric intake
-            pressure_ratio = p_down_abs / p_up_abs                  # → 3.47, not 2.5
+            pressure_ratio = test3_pressure_bar[i] / 1.0
             t_peak_k = t_in_k * (pressure_ratio ** ((self.gamma - 1.0) / self.gamma))
             
             # 4. Calibrate Effectiveness (Epsilon)
@@ -332,9 +283,9 @@ class SmartCompressor_120RND:
 if __name__ == "__main__":
     # Initialize the components
     comp = SmartCompressor_120RND()
-    pid = ThermalPIDController(kp=5.0, ki=0.8, kd=0.2, target_temp_c=60.0)
+    pid = ThermalPIDController(kp=4.0, ki=0.5, kd=0.1, target_temp_c=50.0)
     hose = dh.DischargeHose_HiPoFlex()
-    Cooling_coil = cc.CopperCoolingCoil_TwinFan() 
+    Cooling_coil = cc.CopperCoolingCoil_TwinFan()
     Nrv = nrv.SMC_AKH10_NRV()
     Air_filter = af.SMC_AF20_Filter()
     Water_sep = ws.SMC_AFG20_WaterSeparator()
@@ -346,7 +297,7 @@ if __name__ == "__main__":
     # Mist_sep = ms.SMC_AFM20_MistSeparator(valve_closed= True  )  # Simulating the unvalved 1.8mm leak
     
     # NEW: Initialize Intake Components
-    Silencer = sl.AcousticSilencerChamber(chamber_vol_liters=0.564)  # ID - 114.3 , Length - 55.0 mm, Volume - 564 mL
+    Silencer = sl.AcousticSilencerChamber(chamber_vol_liters=2.0)
     Hepa = hp.ZF111_HEPA_Filter()
     # Note: Cabinet filter is just a function, so we don't need to initialize a class for it!
     
@@ -357,13 +308,13 @@ if __name__ == "__main__":
     comp.temp_motor_k = temp_room_k
     comp.temp_head_k = temp_room_k
 
-    dt_s = 0.01
+    dt_s = 0.001
 
     tank = dt.SmartCompressorTankTwin(
         volume_liters=2.0,
         motor_voltage_v=24.0
     )
-    total_time_s = 1500
+    total_time_s = 600
     time = np.arange(0, total_time_s, dt_s)
 
 
@@ -376,6 +327,7 @@ if __name__ == "__main__":
     hist_temp_motor_c = []
     hist_temp_head_c = []
     hist_q_mist = []
+    hist_q_comp = []
     hist_q_vent = []
     hist_blower_cfm = []
 
@@ -390,207 +342,173 @@ if __name__ == "__main__":
     hist_p_af = []
     hist_p_ws = []
     hist_p_ms = []
+    hist_delta_P_af = []
+    hist_delta_P_wf = []
+    hist_delta_P_ms = []
     hist_delta_APU = []
 
     # NEW: Leakage Flow History
     hist_leak_af = []
     hist_leak_ws = []
     hist_leak_ms = []
-    # =================================================================
+
     # Initialize variables for t=0
-    # =================================================================
-    current_blower_cfm = 0.0
-    current_compressor_flow_nlpm = 0.0
-    q_nlpm_mist = 0.0
-    requested_pwm = 1.0                  # FIX: use 1.0 fraction, not 100.0
+    current_blower_cfm = 0.0 
+    current_compressor_flow_nlpm = 0.0 
+    q_nlpm_mist = 0.0          
+    requested_pwm = 100.0      
 
     # FIX: seed friction with a realistic non-zero value so the chain
     # sees meaningful inlet pressure from step 1 instead of atmospheric.
     # ~0.15 bar is a reasonable first-principles estimate of line losses.
     actual_system_friction_pa = 0.0
     p_tank_abs_pa = 101325.0
-    actual_intake_m_dot_kg_s = 0.0
-    m_dot_kg_s = 0.0                     # FIX: declare before loop
+    actual_intake_m_dot_kg_s = 0.0 
 
     for t in time:
-
-        # =================================================================
+        
+        # =====================================================================
         # 1. INTAKE DYNAMICS
-        # =================================================================
-        # rho_room = 101325.0 / (287.05 * temp_room_k)
-        # intake_flow_lpm = (actual_intake_m_dot_kg_s / rho_room) * 1000.0 * 60.0
-        # intake_flow_cfm = intake_flow_lpm * 0.0353147
+        # =====================================================================
+        rho_room = 101325.0 / (287.05 * temp_room_k) 
+        intake_flow_lpm = (actual_intake_m_dot_kg_s / rho_room) * 1000.0 * 60.0
+        intake_flow_cfm = intake_flow_lpm * 0.0353147
 
-        # dp_cabinet_pa = cf.calculate_filter_pressure_drop(flow_rate_cfm=intake_flow_cfm)
-        # p_after_cabinet_pa = 101325.0 - dp_cabinet_pa
+        dp_cabinet_pa = cf.calculate_filter_pressure_drop(flow_rate_cfm=intake_flow_cfm)
+        p_after_cabinet_pa = 101325.0 - dp_cabinet_pa
 
-        # Hepa.update_loading(intake_flow_lpm, dt_s)
-        # dp_hepa_pa = Hepa.pressure_drop(intake_flow_lpm)
-        # p_after_hepa_pa = p_after_cabinet_pa - dp_hepa_pa
+        Hepa.update_loading(intake_flow_lpm, dt_s)
+        dp_hepa_pa = Hepa.pressure_drop(intake_flow_lpm)
+        p_after_hepa_pa = p_after_cabinet_pa - dp_hepa_pa
 
-        # p_silencer_pa, _ = Silencer.update_state(
-        #     P_upstream_pa=p_after_hepa_pa,
-        #     m_dot_out_kg_s=actual_intake_m_dot_kg_s,
-        #     dt_s=dt_s
-        # )
-
-        # p_comp_intake_pa, _ = Intake_hose.calculate_hose_state(
-        #     m_dot_kg_s=actual_intake_m_dot_kg_s,
-        #     P_in_pa=p_silencer_pa,
-        #     T_in_k=temp_room_k,
-        #     T_amb_k=temp_room_k
-        # )
-
-        # Safety clamp: prevent silencer instability from crashing everything
-
-        # p_comp_intake_pa = max(50000.0, p_comp_intake_pa)
-        p_comp_intake_pa = 101325.0  # FIX: For now, assume intake is always atmospheric
-
-        # =================================================================
-        # 2. THE COMPRESSOR
-        # FIX: The compressor works against (tank + line friction) as back-pressure.
-        # This is the correct positive-displacement pump model.
-        # actual_system_friction_pa carries the previous step's measured chain losses.
-        # =================================================================
-        p_comp_discharge_pa = p_tank_abs_pa + actual_system_friction_pa
-        # p_comp_discharge_pa = p_tank_abs_pa
-
-        (current_compressor_flow_nlpm, current_amps, temp_out_gas_k,
-         act_pwm, temp_motor_k, temp_head_k, power_w) = comp.update_system_state(
-            p_up_pa=p_comp_intake_pa,
-            temp_up_k=temp_room_k,
-            p_down_pa=p_comp_discharge_pa,    
-            req_pump_pwm=requested_pwm,
-            req_blower_cfm=current_blower_cfm,
+        p_silencer_pa, _ = Silencer.update_state(
+            P_upstream_pa=p_after_hepa_pa, 
+            m_dot_out_kg_s=actual_intake_m_dot_kg_s, 
             dt_s=dt_s
         )
 
-        raw_m_dot_kg_s = (current_compressor_flow_nlpm / 1000.0 / 60.0) * comp.rho_normal
-
-        # FIX: Light smoothing (0.5 alpha) to damp ping-pong without killing startup.
-        # Also UPDATE smoothed_discharge_m_dot so the chain actually receives real flow.
-        # m_dot_kg_s = (0.8 * m_dot_kg_s) + (0.2 * raw_m_dot_kg_s)   # FIX: update in-place
-        m_dot_kg_s = raw_m_dot_kg_s
-
-        # Update intake tracker (slightly lagged, as before)
-        # actual_intake_m_dot_kg_s = (0.8 * actual_intake_m_dot_kg_s) + (0.2 * raw_m_dot_kg_s)
-
-        # # =================================================================
-        # # 3. DISCHARGE HOSE & COOLING COIL
-        # # FIX: pass m_dot_kg_s (not a stale zero variable) to all chain components
-        # # =================================================================
-        # P_out_pa_hose, T_out_k_hose = hose.calculate_hose_state(
-        #     m_dot_kg_s=m_dot_kg_s,
-        #     P_in_pa=p_comp_discharge_pa,
-        #     T_in_k=temp_out_gas_k,
-        #     T_amb_k=temp_room_k
-        # )
-
-        # T_out_k_coil, T_ambient_out_celsius, P_out_pa_coil = Cooling_coil.analyze_coil(
-        #     m_dot_kg_s=m_dot_kg_s,
-        #     P_in_pa=P_out_pa_hose,
-        #     T_in_k=T_out_k_hose,
-        #     T_amb_k=temp_room_k,
-        #     selected_length=3.36
-        # )
-        # comp.temp_air = T_ambient_out_celsius + 273.15
-
-
-        # =================================================================
-        # 3. DISCHARGE HOSE & COOLING COIL
-        # =================================================================
-        P_out_pa_hose, T_out_k_hose = hose.calculate_hose_state(
-            m_dot_kg_s=m_dot_kg_s,
-            P_in_pa=p_comp_discharge_pa,
-            T_in_k=temp_out_gas_k,
-            T_amb_k=temp_room_k
+        # D. Intake Hose (Real Physics Module)
+        # We use an underscore '_' for the output temperature because 
+        # the air is already at room temp, so we don't need to track it.
+        p_comp_intake_pa, _ = Intake_hose.calculate_hose_state(
+            m_dot_kg_s = actual_intake_m_dot_kg_s,
+            P_in_pa = p_silencer_pa,       
+            T_in_k = temp_room_k,
+            T_amb_k = temp_room_k 
         )
 
-        # FIX: Guard against zero/tiny flow before calling the coil.
-        # At near-zero flow there is no heat transfer; pass-through unchanged.
-        if m_dot_kg_s > 1e-5:
-            T_out_k_coil, T_ambient_out_celsius, P_out_pa_coil = Cooling_coil.analyze_coil(
-                m_dot_kg_s=m_dot_kg_s,
-                P_in_pa=P_out_pa_hose,
-                T_in_k=T_out_k_hose,
-                T_amb_k=temp_room_k,
-                selected_length=3.36
-            )
-            comp.temp_air = T_ambient_out_celsius + 273.15
-        else:
-            T_out_k_coil = T_out_k_hose
-            P_out_pa_coil = P_out_pa_hose
 
-        # =================================================================
+        # dp_intake_hose_pa = 200.0 * (intake_flow_lpm / 100.0)**2 
+        # p_comp_intake_pa = p_silencer_pa - dp_intake_hose_pa
+        # p_comp_intake_pa = max(10000.0, p_comp_intake_pa)
+
+        # =====================================================================
+        # 2. THE COMPRESSOR
+        # =====================================================================
+        p_comp_discharge_pa = p_tank_abs_pa + actual_system_friction_pa
+        # p_comp_discharge_pa = p_tank_abs_pa
+
+        (current_compressor_flow_nlpm, current_amps, temp_out_gas_k, 
+         act_pwm, temp_motor_k, temp_head_k, power_w) = comp.update_system_state(
+            p_up_pa = p_comp_intake_pa,          
+            temp_up_k = temp_room_k, 
+            p_down_pa = p_comp_discharge_pa,     
+            req_pump_pwm = requested_pwm,        
+            req_blower_cfm = current_blower_cfm, 
+            dt_s = dt_s
+        )
+        # if t % 75.0 < dt_s:
+        #     print(current_compressor_flow_nlpm)
+        m_dot_kg_s = (current_compressor_flow_nlpm / 1000.0 / 60.0) * comp.rho_normal
+        actual_intake_m_dot_kg_s = (0.8 * actual_intake_m_dot_kg_s) + (0.2 * m_dot_kg_s) 
+
+        # =====================================================================
+        # 3. DISCHARGE HOSE & COOLING COIL
+        # =====================================================================
+        P_out_pa_hose, T_out_k_hose = hose.calculate_hose_state(
+            m_dot_kg_s = m_dot_kg_s,
+            P_in_pa = p_comp_discharge_pa,       
+            T_in_k = temp_out_gas_k,
+            T_amb_k = temp_room_k 
+        )
+
+        T_out_k_coil, T_ambient_out_celsius, P_out_pa_coil = Cooling_coil.analyze_coil(
+            m_dot_kg_s = m_dot_kg_s,
+            P_in_pa = P_out_pa_hose,  
+            T_in_k = T_out_k_hose,
+            T_amb_k = temp_room_k,
+            selected_length = 3.36 
+        )
+        comp.temp_air = T_ambient_out_celsius + 273.15
+
+        # =====================================================================
         # 4. NRV & SEPARATORS
-        # =================================================================
+        # =====================================================================
         P_out_pa_nrv, delta_p_mbar_nrv, T_out_k_nrv = Nrv.calculate_valve_state(
-            m_dot_kg_s=m_dot_kg_s,
-            P_in_pa=P_out_pa_coil,
-            T_in_k=T_out_k_coil
+            m_dot_kg_s = m_dot_kg_s,
+            P_in_pa = P_out_pa_coil,
+            T_in_k = T_out_k_coil
         )
 
         P_out_pa_filter, delta_p_mbar_filter, dp_viscous_mbar, dp_inertial_mbar, m_dot_out_kg_s_air_filter = Air_filter.calculate_filter_state(
             t=t,
-            m_dot_kg_s=m_dot_kg_s,
-            P_in_pa=P_out_pa_nrv,
-            T_in_k=T_out_k_nrv
+            m_dot_kg_s = m_dot_kg_s,
+            P_in_pa = P_out_pa_nrv,
+            T_in_k = T_out_k_nrv
         )
-        
+
         P_out_pa_water, delta_p_mbar_water, m_dot_effective_water, water_escaped_mg_s, vapor_passed_mg_s = Water_sep.update_state(
-            t = t,
-            m_dot_in_kg_s=m_dot_out_kg_s_air_filter,
-            P_in_pa=P_out_pa_filter,
-            T_in_k=T_out_k_nrv,
-            T_amb_C=temp_room_k - 273.15,
-            RH_amb=0.5
+            t=t,
+            m_dot_in_kg_s = m_dot_out_kg_s_air_filter,
+            P_in_pa = P_out_pa_filter,
+            T_in_k = T_out_k_nrv,
+            T_amb_C = temp_room_k - 273.15,
+            RH_amb = 0.5
         )
 
 
         P_out_pa_mist, delta_p_mbar_mist, q_nlpm_mist, mist_escaped_mg_s = Mist_sep.update_state(
-            t = t, 
-            m_dot_in_kg_s=m_dot_effective_water,
-            P_in_pa=P_out_pa_water,
-            T_in_k=T_out_k_nrv,
-            aerosol_water_in_mg_s=vapor_passed_mg_s,
-            dt_seconds=dt_s,
+            t=t,
+            m_dot_in_kg_s = m_dot_effective_water,
+            P_in_pa = P_out_pa_water,
+            T_in_k = T_out_k_nrv,
+            aerosol_water_in_mg_s= vapor_passed_mg_s,
+            dt_seconds = dt_s,
         )
 
-        # =================================================================
-        # 5. THE TANK
-        # =================================================================
+        # =====================================================================
+        # 5. THE TANK 
+        # =====================================================================
         p_tank_gauge, requested_pwm, q_pump_in, q_vent_out = tank.simulate(
-            t=t,
-            T_in_K=T_out_k_nrv,
+            t = t,
+            T_in_K= T_out_k_nrv,
             dt_s=dt_s,
             t_insp=0.5,
-            flow_insp=50,
+            flow_insp=60,
             t_exp=0.5,
-            flow_exp=50,
-            external_inflow_nlpm=q_nlpm_mist
+            flow_exp=60,
+            external_inflow_nlpm= q_nlpm_mist,  
         )
         p_tank_abs_pa = (p_tank_gauge * 100000.0) + 101325.0
+        # print(q_pump_in)
 
-        # =================================================================
+
+        # =====================================================================
         # 6. SYSTEM CONTROLLERS
-        # FIX: restore friction feedback loop so p_comp_discharge_pa adapts correctly.
-        # The friction is the TRUE measured pressure drop across the entire APU chain.
-        # Use 70/30 smoothing: enough lag to prevent oscillation, fast enough to track.
-        # =================================================================
+        # =====================================================================
         fan_pwm = pid.update(temp_head_k - 273.15, dt_s)
         fan_cfm = get_cfm_from_pwm(fan_pwm)
-        current_blower_cfm = max(fan_cfm, 0)
+        current_blower_cfm = max(2 * fan_cfm, 0)  
 
         new_friction_pa = max(0.0, p_comp_discharge_pa - P_out_pa_mist)
-        actual_system_friction_pa = (0.3 * actual_system_friction_pa) + (0.7 * new_friction_pa)
+        actual_system_friction_pa = (0* actual_system_friction_pa) + (1 * new_friction_pa)
 
-        # =================================================================
+        # =====================================================================
         # 7. METRICS & APPEND (Downsampled to 2 seconds)
-        # =================================================================
+        # =====================================================================
         if t % 2.0 < dt_s:
-            # hist_p_hepa.append((p_after_hepa_pa - 101325.0) / 100000.0)
-            # hist_p_silencer.append((p_silencer_pa - 101325.0) / 100000.0)
-            hist_p_intake.append((p_comp_intake_pa - 101325.0) / 100000.0)
+            
+            # --- CALCULATE CASCADING PRESSURES (Convert Pa Abs to Bar Gauge) ---
             hist_p_comp.append((p_comp_discharge_pa - 101325.0) / 100000.0)
             hist_flow_compressor.append(current_compressor_flow_nlpm)
             hist_p_hose.append((P_out_pa_hose - 101325.0) / 100000.0)
@@ -598,29 +516,40 @@ if __name__ == "__main__":
             hist_p_af.append((P_out_pa_filter - 101325.0) / 100000.0)
             hist_p_ws.append((P_out_pa_water - 101325.0) / 100000.0)
             hist_p_ms.append((P_out_pa_mist - 101325.0) / 100000.0)
+            hist_delta_P_af.append(delta_p_mbar_filter/1000)
+            hist_delta_P_wf.append(delta_p_mbar_water/100000)
+            hist_delta_P_ms.append(delta_p_mbar_mist/100000)
             hist_p_tank.append(p_tank_gauge)
-            hist_delta_APU.append((p_comp_discharge_pa - P_out_pa_mist) / 100000.0)
+            hist_delta_APU.append((P_out_pa_coil - P_out_pa_mist) / 100000.0)
 
+            
+            # --- CALCULATE LEAKAGE FLOWS (NLPM) ---
+            # Conversion factor: kg/s -> NLPM based on standard air density
             to_nlpm = (1.0 / comp.rho_normal) * 60000.0
-            af_leak  = max(0.0, (m_dot_kg_s - m_dot_out_kg_s_air_filter) * to_nlpm)
-            ws_leak  = max(0.0, (m_dot_out_kg_s_air_filter - m_dot_effective_water) * to_nlpm)
-            ms_leak  = max(0.0, (m_dot_effective_water * to_nlpm) - q_nlpm_mist)
-
+            
+            # Leakage = Mass entering the component MINUS Mass leaving the component
+            af_leak = max(0.0, (m_dot_kg_s - m_dot_out_kg_s_air_filter) * to_nlpm)
+            ws_leak = max(0.0, (m_dot_out_kg_s_air_filter - m_dot_effective_water) * to_nlpm)
+            ms_leak = max(0.0, ((m_dot_effective_water)*to_nlpm - q_nlpm_mist))
+            
             hist_leak_af.append(af_leak)
             hist_leak_ws.append(ws_leak)
             hist_leak_ms.append(ms_leak)
+            
 
+            # --- STANDARD METRICS ---
             hist_time.append(t)
-            hist_pwm.append(act_pwm * 100.0)
-            hist_power.append(power_w)
-            hist_temp_motor_c.append(temp_motor_k - 273.15)
-            hist_temp_head_c.append(temp_head_k - 273.15)
+            hist_pwm.append(act_pwm * 100.0) 
+            hist_power.append(power_w) 
+            hist_temp_motor_c.append(temp_motor_k - 273.15) 
+            hist_temp_head_c.append(temp_head_k - 273.15)   
+            hist_q_comp.append(current_compressor_flow_nlpm)
             hist_q_mist.append(q_nlpm_mist)
             hist_q_vent.append(q_vent_out)
             hist_blower_cfm.append(current_blower_cfm)
 
         # if t % 75.0 < dt_s:
-        #     print(f"Time: {t:.1f}s | Tank: {p_tank_gauge:.3f} Bar | Discharge: {p_comp_discharge_pa/1e5:.3f} Bar abs | Flow→Tank: {q_nlpm_mist:.1f} NLPM | Friction: {actual_system_friction_pa/100:.0f} mbar | Head: {temp_head_k-273.15:.1f}°C")
+        #     print(q_pump_in)
 
 # =====================================================================
     # DASHBOARD GENERATION (Now with Units!)
@@ -648,15 +577,19 @@ if __name__ == "__main__":
     fig.add_trace(go.Scatter(x=hist_time, y=hist_p_hose, name="2. After Hose", line=dict(color='orangered', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
     fig.add_trace(go.Scatter(x=hist_time, y=hist_p_coil, name="3. After Coil", line=dict(color='orange', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
     fig.add_trace(go.Scatter(x=hist_time, y=hist_p_af, name="4. After Air Filter", line=dict(color='green', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=hist_time, y=hist_p_ws, name="5. After Water Sep", line=dict(color='blue', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=hist_time, y=hist_p_ms, name="6. After Mist Sep", line=dict(color='purple', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=hist_time, y=hist_p_tank, name="7. Final Tank Pres", line=dict(color='black', width=3), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=hist_time, y=hist_delta_P_af, name="5. Delta_P Air Filter", line=dict(color='skyblue', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=hist_time, y=hist_delta_P_wf, name="6. Delta_P water Filter ", line=dict(color='green', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=hist_time, y=hist_delta_P_ms, name="7. Delta_P Mist Filter", line=dict(color='green', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=hist_time, y=hist_p_ws, name="8. After Water Sep", line=dict(color='blue', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=hist_time, y=hist_p_ms, name="9. After Mist Sep", line=dict(color='purple', width=1), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=hist_time, y=hist_p_tank, name="10. Final Tank Pres", line=dict(color='black', width=3), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
     fig.add_trace(go.Scatter(x=hist_time, y=hist_delta_APU, name="Delta P Across APU", line=dict(color='teal', dash='dash', width=2), hovertemplate="%{y:.4f} Bar | %{customdata}"), row=1, col=1)
 
     # --- ROW 2: Net Flows ---
     fig.add_trace(go.Scatter(x=hist_time, y=hist_q_vent, name="Ventilator Demand", line=dict(color='orange', dash='dash', width=2), hovertemplate="%{y:.1f} NLPM | %{customdata}"), row=2, col=1)
     fig.add_trace(go.Scatter(x=hist_time, y=hist_q_mist, name="Total Supply to Tank", line=dict(color='green', width=2), hovertemplate="%{y:.1f} NLPM | %{customdata}"), row=2, col=1)
-    fig.add_trace(go.Scatter(x=hist_time, y=hist_flow_compressor, name="Compressor Flow", line=dict(color='darkblue', width=2), hovertemplate="%{y:.1f} NLPM | %{customdata}"), row=2, col=1)
+    fig.add_trace(go.Scatter(x=hist_time, y=hist_flow_compressor, name="Total Supply from compressor", line=dict(color='violet', width=2), hovertemplate="%{y:.1f} NLPM | %{customdata}"), row=2, col=1)
+
     # --- ROW 3: Drain Leakages ---
     fig.add_trace(go.Scatter(x=hist_time, y=hist_leak_af, name="Air Filter Leak", line=dict(color='green', dash='dot', width=2), hovertemplate="%{y:.4f} NLPM | %{customdata}"), row=3, col=1)
     fig.add_trace(go.Scatter(x=hist_time, y=hist_leak_ws, name="Water Sep Leak", line=dict(color='blue', dash='dot', width=2), hovertemplate="%{y:.4f} NLPM | %{customdata}"), row=3, col=1)

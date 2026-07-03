@@ -93,7 +93,7 @@ class SMC_AFM20_MistSeparator:
         """
         # 1. Base pressure drop at the SMC 0.3 MPa (4 Bar Absolute) reference
         dp_dry_base = 36 * Q_nlpm + 0.073 * (Q_nlpm ** 2)
-        dp_wet_max = 400.0 * Q_nlpm  # Max theoretical water blockage
+        dp_wet_max = 150.0 * Q_nlpm  # Max theoretical water blockage
         
         # Aerodynamic clearing: high flow violently blows water out of the pores (k = 0.015)
         dp_wet_base = dp_dry_base + (dp_wet_max * np.exp(-0.015 * Q_nlpm))
@@ -102,8 +102,19 @@ class SMC_AFM20_MistSeparator:
         dp_base_4bar = dp_dry_base + (dp_wet_base - dp_dry_base) * self.saturation_ratio
         
         # 3. The Pressure Scaling Factor (1 to 7 Bar Range)
-        P_ref_abs_pa = 400000.0 # 4 Bar Absolute (0.3 MPa Gauge) Reference
-        pressure_ratio = P_ref_abs_pa / P_in_pa 
+
+        # 3. The Pressure Scaling Factor (Clamped to prevent mathematical explosions)
+        P_ref_abs_pa = 400000.0 
+        safe_P_in = max(100000.0, P_in_pa) # Prevent division by a vacuum
+        # pressure_ratio = P_ref_abs_pa / safe_P_in
+        # pressure_ratio = min(4.0, pressure_ratio) # Cap the multiplier
+
+        # Apply the square root for Darcy porous media flow
+        pressure_ratio = math.sqrt(P_ref_abs_pa / safe_P_in)
+        pressure_ratio = min(2.0, pressure_ratio) # Cap the multiplier
+
+        # P_ref_abs_pa = 400000.0 # 4 Bar Absolute (0.3 MPa Gauge) Reference
+        # pressure_ratio = P_ref_abs_pa / P_in_pa 
         
         # The final, mathematically true pressure drop for this exact millisecond
         dp_actual_pa = dp_base_4bar * pressure_ratio 
@@ -158,8 +169,8 @@ class SMC_AFM20_MistSeparator:
         # 2. Leakage Check (Bleeds from the bowl at downstream pressure)
         m_dot_leak_kg_s = self.calculate_leakage(P_bowl_pa, T_in_k)
         leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
-        if t % 100 ==0:
-            print(f"Leakage Mass Flow_nlpm_mist: {leak_nlpm:.6f} nlpm at P_out_mist: {P_bowl_pa/100000:.3f} Bar abs, T_in_mist: {T_in_k-273.15:.1f} °C")
+        if t % 10 ==0:
+            print(f"Leakage Mass Flow_nlpm_mist: {leak_nlpm:.6f} nlpm at P_out_mist: {dp_pa/100000:.3f} Bar abs, T_in_mist: {T_in_k-273.15:.1f} °C")
 
         
         # 3. Effective Output Mass Flow (What survives to the patient)
@@ -178,7 +189,7 @@ class SMC_AFM20_MistSeparator:
         
         q_nlpm = (m_dot_effective / 1.204) * 60000.0
 
-        return P_bowl_pa, dp_pa, m_dot_effective, water_escaped_mg_s
+        return P_bowl_pa, dp_pa, q_nlpm, water_escaped_mg_s
         # return {
         #     "P_out_pa": P_bowl_pa,
         #     "dp_pa": dp_pa,
@@ -198,6 +209,8 @@ if __name__ == "__main__":
     T_in = 293.15       # 20 deg C
     m_in = 0.002        # 100 NLPM flow from compressor
     aerosol_in = 10.0   # 10 mg/s of mist entering
+    dt_seconds = 1
+    t =1
     
     print("=== SMC AFM20 Micro-Mist Separator Digital Twin ===")
     
@@ -209,18 +222,18 @@ if __name__ == "__main__":
     
     # Test 1: Operating at 3 Bar Gauge (4 Bar Abs)
     P_4bar = 400000.0 
-    res_4bar = mist_separator.update_state(m_in, P_4bar, T_in, aerosol_in)
+    res_4bar = mist_separator.update_state(t, m_in, P_4bar, T_in, aerosol_in, dt_seconds)
     print(f"Test 1: 3 Bar Gauge System Pressure")
     print(f" -> Aerodynamic Pressure Drop: {res_4bar['dp_pa']/100:.1f} mBar (Matches SMC 0.3 MPa curve)")
     
     # Test 2: Operating at 7 Bar Gauge (8 Bar Abs)
     P_8bar = 800000.0
-    res_8bar = mist_separator.update_state(m_in, P_8bar, T_in, aerosol_in)
+    res_8bar = mist_separator.update_state(t, m_in, P_8bar, T_in, aerosol_in, dt_seconds)
     print(f"\nTest 2: 7 Bar Gauge System Pressure (Highly Compressed Air)")
     print(f" -> Aerodynamic Pressure Drop: {res_8bar['dp_pa']/100:.1f} mBar (Matches SMC 0.7 MPa curve)")
     
     # Test 3: Operating at 1 Bar Gauge (2 Bar Abs)
     P_2bar = 200000.0
-    res_2bar = mist_separator.update_state(m_in, P_2bar, T_in, aerosol_in)
+    res_2bar = mist_separator.update_state(t, m_in, P_2bar, T_in, aerosol_in, dt_seconds)
     print(f"\nTest 3: 1 Bar Gauge System Pressure (Expanding Air)")
     print(f" -> Aerodynamic Pressure Drop: {res_2bar['dp_pa']/100:.1f} mBar (Heavy Drag Penalty)")
