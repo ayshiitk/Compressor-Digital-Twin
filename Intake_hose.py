@@ -79,6 +79,7 @@ class IntakeHose_HiPoFlex:
         delta_p_bends = (self.num_90_bends * self.K_per_bend) * dyn_pressure
         
         P_out_pa = P_in_pa - (delta_p_straight + delta_p_bends)
+        print("Intake pressure out:", P_out_pa / 1e5, "\n")
 
         # ==========================================
         # PART 2: THERMODYNAMICS (Heat Loss via NTU)

@@ -169,8 +169,8 @@ class SMC_AFM20_MistSeparator:
         # 2. Leakage Check (Bleeds from the bowl at downstream pressure)
         m_dot_leak_kg_s = self.calculate_leakage(P_bowl_pa, T_in_k)
         leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
-        if t % 10 ==0:
-            print(f"Leakage Mass Flow_nlpm_mist: {leak_nlpm:.6f} nlpm at P_out_mist: {dp_pa/100000:.3f} Bar abs, T_in_mist: {T_in_k-273.15:.1f} °C")
+        # if t % 10 ==0:
+        #     print(f"Leakage Mass Flow_nlpm_mist: {leak_nlpm:.6f} nlpm at P_out_mist: {dp_pa/100000:.3f} Bar abs, T_in_mist: {T_in_k-273.15:.1f} °C")
 
         
         # 3. Effective Output Mass Flow (What survives to the patient)
