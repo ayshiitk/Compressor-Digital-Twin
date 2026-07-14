@@ -60,6 +60,7 @@ class SmartCompressor:
         self.temp_ambient_k = 293.15
         self.temp_motor_k = 293.15
         self.temp_head_k = 293.15
+        self.voltage_v = 24.0
 
         self.flow_curve = np.polyfit( self.raw_pressure_bar, self.raw_flow_nlpm, 2)
         self.current_curve = np.polyfit(self.raw_pressure_bar, self.raw_current_amps, 3)
@@ -241,7 +242,7 @@ class SmartCompressor:
                 epsilon_values[i] = 0.0
                 
             # 5. FIRST LAW ENTHALPY BALANCE
-            total_elec_power_w = 24.0 * test3_amps[i]
+            total_elec_power_w = self.voltage_v * test3_amps[i]
             motor_heat_w = (test3_amps[i] ** 2) * self.R_coil_hot_ohms
             gas_enthalpy_w = mass_flow_kg_s * self.cp_air * (t_gas_out_k - t_in_k)
             
@@ -276,11 +277,13 @@ class SmartCompressor:
         return requested_pwm * throttle_multiplier
 
 
-    def update_system_state(self, p_up_pa, temp_up_k, p_down_pa, req_pump_pwm, req_blower_cfm, dt_s):
+    def update_system_state(self, voltage_v, p_up_pa, temp_up_k, p_down_pa, req_pump_pwm, req_blower_cfm, dt_s):
         """
         Advances the simulation by 1 timestep (dt_s). 
         Calculates fluid dynamics, tracks heat generation, and updates metal temperatures.
         """
+
+        self.voltage_v = voltage_v
         # Step 1: Input Validation & Safety Throttling
         req_pump_pwm = max(0.0, min(1.0, req_pump_pwm))
         req_blower_cfm = max(0.0, req_blower_cfm)
@@ -322,7 +325,7 @@ class SmartCompressor:
             temp_out_gas_k = temp_peak_k - self.epsilon_head * (temp_peak_k - self.temp_head_k)
 
             # C) Calculate Enthalpy and pure Head Friction Heat
-            total_electrical_power_w = 24.0 * current_amps
+            total_electrical_power_w = self.voltage_v * current_amps
             gas_enthalpy_w = mass_flow_kg_s * self.cp_air * (temp_out_gas_k - temp_up_k)
             heat_head_w = max(0.0, total_electrical_power_w - heat_motor_w - gas_enthalpy_w)
 

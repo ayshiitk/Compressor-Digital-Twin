@@ -309,10 +309,23 @@ class SmartCompressorTankTwin:
 
         self.last_actual_inflow_nlpm = actual_inflow_nlpm
 
-        return p_tank_gauge, current_pwm, actual_inflow_nlpm, q_vent_actual
+        # print (current_pwm)
+
+        # return current_pwm
+        return p_tank_gauge, current_pwm*100, actual_inflow_nlpm, q_vent_actual
 
 
 
+# if __name__ == "__main__":
+
+    # tank = SmartCompressorTankTwin(volume_liters=2.0, motor_voltage_v=24.0)
+    # total_time_s = 10.0 
+
+    # s = tank.simulate(t=0.0, T_in_K=293.15, dt_s=0.1, t_insp=0.5, flow_insp=80.0, t_exp=0.5, flow_exp=80.0)
+    # print (s)
+
+    # pwm = tank.calculate_controller_pwm(p_gauge_bar=3.50, avg_demand_nlpm=10.0)
+    # print (pwm)
 
 
 

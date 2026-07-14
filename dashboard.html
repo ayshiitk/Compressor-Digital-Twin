@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin Telemetry</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    
+    <style>
+        /* =========================================
+           BRAND THEME & LAYOUT CSS
+           ========================================= */
+   :root {
+            --primary: #0066CC;       
+            --bg-surface: #F4F7FA;    
+            --bg-panel: #ffffff;      
+            --text-dark: #1E293B;     
+            --text-muted: #64748b;    
+            
+            --ok-green: #10B981;      
+            --alert-amber: #F59E0B;   
+            --crit-red: #EF4444;      
+            
+            --border-color: #e2e8f0;
+            --font-label: 'Rajdhani', sans-serif;
+            --font-num: 'Share Tech Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--bg-surface);
+            color: var(--text-dark);
+            font-family: var(--font-label);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            overflow-y: auto;
+            background-image: 
+                linear-gradient(rgba(30, 41, 59, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(30, 41, 59, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* HEADER */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 20px;
+            background-color: var(--text-dark);
+            border-bottom: 3px solid var(--primary);
+            height: 60px; flex-shrink: 0;
+            color: #fff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-left, .header-center, .header-right { display: flex; align-items: center; gap: 15px; }
+        .header-title { font-size: 1.3rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+        .clock { font-family: var(--font-num); font-size: 1.5rem; color: var(--ok-green); text-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+        
+        .status-indicator { display: flex; align-items: center; gap: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; background-color: var(--text-muted); box-shadow: 0 0 8px currentColor; }
+        .status-indicator.live { color: var(--ok-green); }
+        .status-indicator.connecting { color: var(--alert-amber); }
+        .status-indicator.disconnected { color: var(--crit-red); }
+
+        /* BUTTONS */
+        .btn {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff;
+            font-family: var(--font-label); font-weight: 700; font-size: 1rem;
+            padding: 6px 16px; cursor: pointer; text-transform: uppercase;
+            border-radius: 4px; transition: all 0.2s;
+        }
+        .btn:hover { background: rgba(255,255,255,0.2); }
+        .btn-green { border-color: var(--ok-green); color: var(--ok-green); }
+        .btn-green:hover { background: var(--ok-green); color: #fff; }
+        .btn-red { border-color: var(--crit-red); color: var(--crit-red); }
+        .btn-red:hover { background: var(--crit-red); color: #fff; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .btn-primary:hover { background: #005bb5; }
+        
+        .speed-control { display: flex; align-items: center; gap: 6px; color: #fff; font-weight: 700; text-transform: uppercase; }
+        .speed-control input { width: 64px; padding: 5px 6px; font-size: 1rem; }
+        .speed-control .btn { padding: 5px 10px; font-size: 0.85rem; }
+
+        /* GRID LAYOUT */
+        .main-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 300px;
+            gap: 15px; padding: 15px; flex-grow: 1;
+        }
+
+        .panel {
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 15px; display: flex; flex-direction: column;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;
+        }
+        .panel-title { font-size: 0.95rem; font-weight: 700; text-transform: uppercase; color: var(--text-dark); margin-bottom: 12px; letter-spacing: 1px; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;}
+
+        /* INPUTS & MODE */
+        .mode-grid { display: grid; gap: 10px; }
+        .input-group { display: flex; flex-direction: column; gap: 2px; }
+        .input-group label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        input[type="number"], select {
+            background: var(--bg-surface); border: 1px solid var(--border-color);
+            color: var(--text-dark); font-family: var(--font-num); font-size: 1.1rem;
+            padding: 8px; outline: none; border-radius: 4px; font-weight: bold;
+        }
+        input[type="number"]:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0,102,204,0.2); }
+        input[type="range"] { width: 100%; accent-color: var(--primary); }
+        .control-row { display: grid; grid-template-columns: 1fr 72px; gap: 8px; align-items: center; }
+        .control-row input[type="number"] { width: 72px; text-align: center; }
+        
+        .active-mode-display { margin-bottom: 15px; padding-bottom: 10px; }
+        .active-mode-name { font-family: var(--font-num); font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+
+        /* GAUGES */
+        .center-column { display: flex; flex-direction: column; gap: 15px; }
+        .gauges-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        .gauge-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px;
+            position: relative; padding: 10px; 
+        }
+        .gauge-svg { width: 100%; height: auto; max-height: 180px; }
+        .gauge-val { font-family: var(--font-num); font-size: 2.2rem; font-weight: bold; color: var(--text-dark); position: absolute; bottom: 35px; text-align: center; width: 100%; }
+        .gauge-label { position: absolute; bottom: 12px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+        /* THERMAL BARS */
+        .temp-row { display: flex; align-items: center; gap: 10px; }
+        .temp-label { width: 95px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-dark); }
+        .temp-track { flex-grow: 1; height: 16px; background: var(--bg-surface); border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
+        .temp-fill { height: 100%; transition: width 0.2s linear, background-color 0.3s; }
+        .temp-val { width: 60px; text-align: right; font-family: var(--font-num); font-weight: bold; font-size: 1.1rem; color: var(--text-dark); }
+        
+        /* BMS & SECONDARY PANELS */
+        .bms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;}
+        .bms-val { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; text-align: center; }
+        .bms-val span { font-family: var(--font-num); font-size: 1.4rem; font-weight: bold; color: var(--text-dark); }
+        .bms-val small { display: block; font-size: 0.7rem; font-weight: bold; color: var(--text-muted); }
+        .bms-status { text-align: center; font-weight: bold; padding: 6px; border-radius: 4px; font-size: 0.9rem; text-transform: uppercase;}
+        
+        .ac-btn-group { display: flex; gap: 5px; margin-top: 10px; }
+        .ac-btn-group .btn { flex: 1; border-color: var(--border-color); color: var(--text-dark); font-size: 0.85rem; }
+        .ac-btn-group .btn:hover { background: var(--border-color); }
+
+        .expandable { cursor: pointer; transition: 0.2s; }
+        .expandable:hover { border-color: var(--primary); }
+        .big-val { font-family: var(--font-num); font-size: 2.2rem; font-weight: bold; color: var(--primary); text-align: center; }
+        .breakdown { display: none; margin-top: 10px; font-family: var(--font-num); font-size: 0.8rem; }
+        .expandable.open .breakdown { display: block; }
+        
+        /* BARS */
+        .bar-row { display: flex; align-items: center; margin-bottom: 6px; gap: 8px; }
+        .bar-label { width: 80px; text-align: right; color: var(--text-dark); font-weight: 700; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        .bar-track { flex-grow: 1; height: 10px; background: var(--bg-surface); border-radius: 5px; overflow: hidden; border: 1px solid var(--border-color); }
+        .bar-fill { height: 100%; background: var(--primary); transition: width 0.1s linear; }
+        .bar-val { width: 40px; text-align: left; font-weight: bold; }
+
+        /* DATA EXPLORER MODAL */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.95); /* Deep dark background */
+            z-index: 1000; display: none; flex-direction: column;
+            backdrop-filter: blur(5px);
+        }
+        .modal-overlay.open { display: flex; }
+        
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 30px; background: var(--text-dark); border-bottom: 3px solid var(--primary);
+            color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .modal-title { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; display: flex; align-items: center; gap: 10px;}
+        .modal-title-pulse { width: 10px; height: 10px; background: var(--alert-amber); border-radius: 50%; animation: pulse 2s infinite; }
+        
+        .modal-actions { display: flex; gap: 15px; }
+        
+        .modal-content {
+            flex: 1; padding: 25px; overflow-y: auto;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            align-content: start;
+        }
+        .chart-card {
+            background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; padding: 15px; height: 320px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .chart-wrapper { width: 100%; height: 100%; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+
+        /* UTILITY STATUS COLORS */
+        .c-ok { color: var(--ok-green) !important; }
+        .bg-ok { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--ok-green); color: var(--ok-green); }
+        .c-alert { color: var(--alert-amber) !important; }
+        .bg-alert { background: rgba(245, 158, 11, 0.1); border: 1px solid var(--alert-amber); color: var(--alert-amber); }
+        .c-crit { color: var(--crit-red) !important; }
+        .bg-crit { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--crit-red); color: var(--crit-red); }
+        .bg-ac { background: rgba(0, 102, 204, 0.1); border: 1px solid var(--primary); color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <!-- MAIN HEADER -->
+    <header>
+        <div class="header-left">
+            <div class="header-title">DIGITAL TWIN</div>
+            <div class="clock" id="sim-clock">00:00.000</div>
+        </div>
+        <div class="header-center">
+            <div class="status-indicator disconnected" id="conn-status">
+                <div class="dot"></div>
+                <span id="conn-text">DISCONNECTED</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-green" onclick="sendSimControl('start')">Run Sim</button>
+            <button class="btn btn-red" onclick="sendSimControl('stop')">Halt</button>
+            <div class="speed-control">
+                <span>Speed</span>
+                <input type="number" id="input-sim-speed" min="0.1" step="0.1" value="1" onchange="sendSimSpeed()" onkeydown="if(event.key === 'Enter') sendSimSpeed()">
+                <button class="btn" onclick="sendSimSpeed()">Apply</button>
+            </div>
+            <!-- REPLACED TOGGLE WITH DATA EXPLORER BUTTON -->
+            <button class="btn btn-primary" onclick="openAnalytics()">📊 Data Explorer</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        
+        <!-- LEFT: MODE CONTROL -->
+        <div class="panel">
+            <div class="panel-title">Ventilation Mode</div>
+            <div class="active-mode-display">
+                <div class="active-mode-name" id="disp-mode-name">---</div>
+                <div style="display: flex; gap:10px; font-family: var(--font-num); color: var(--text-dark); font-size: 1rem; margin-top: 5px; font-weight: bold;">
+                    <div>Insp: <span id="disp-mode-flow" class="c-ok">0</span> LPM</div>
+                    <div>I:E <span id="disp-mode-ie" class="c-ok">0:0</span></div>
+                </div>
+            </div>
+
+            <div class="panel-title" style="margin-top: 10px;">Command Stage</div>
+            <div class="mode-grid">
+                <div class="input-group">
+                    <label>Preset Target</label>
+                    <select id="input-preset" onchange="loadPreset()">
+                        <option value="Custom">Custom</option>
+                        <option value="VCV - Adult">VCV - Adult</option>
+                        <option value="VCV - Pediatric">VCV - Pediatric</option>
+                        <option value="PCV - Adult">PCV - Adult</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Insp Flow Target (LPM)</label>
+                    <input type="number" id="input-flow" value="48.0" step="0.1" oninput="markCustom()">
+                </div>
+                <div class="input-group">
+                    <label>Exp Flow / Bias (LPM)</label>
+                    <input type="number" id="input-exp-flow" value="0.0" step="0.1" oninput="markCustom()">
+                </div>
+                <div class="input-group">
+                    <label>Ti (s)</label>
+                    <input type="number" id="input-ti" value="0.5" step="0.1" oninput="markCustom()">
+                </div>
+                <div class="input-group">
+                    <label>Te (s)</label>
+                    <input type="number" id="input-te" value="0.5" step="0.1" oninput="markCustom()">
+                </div>
+                <button class="btn btn-green" style="margin-top: 10px;" onclick="sendNewMode()">Apply to Tank</button>
+            </div>
+
+            <div class="panel-title" style="margin-top: 16px;">Pump Control</div>
+            <div class="mode-grid">
+                <div class="input-group">
+                    <label>Demand Mode</label>
+                    <select id="input-pump-mode" onchange="sendPumpControl()">
+                        <option value="AUTO">AUTO</option>
+                        <option value="MANUAL">MANUAL</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Manual Command</label>
+                    <select id="input-pump-command-mode" onchange="updatePumpCommandUI(); sendPumpControl()">
+                        <option value="PWM">Speed %</option>
+                        <option value="RPM">Target RPM</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Speed Command (%)</label>
+                    <div class="control-row">
+                        <input type="range" id="input-pump-pwm" min="0" max="100" step="1" value="100" oninput="syncControlValue('pump'); sendPumpControl()">
+                        <input type="number" id="input-pump-pwm-num" min="0" max="100" step="1" value="100" oninput="syncControlValue('pump', true); sendPumpControl()">
+                    </div>
+                </div>
+                <div class="input-group" id="pump-rpm-control" style="display: none;">
+                    <label>Target RPM</label>
+                    <input type="number" id="input-pump-rpm" min="0" max="3000" step="10" value="2500" oninput="sendPumpControl()">
+                </div>
+            </div>
+
+            <div class="panel-title" style="margin-top: 16px;">Blower Control</div>
+            <div class="mode-grid">
+                <div class="input-group">
+                    <label>Cooling Mode</label>
+                    <select id="input-blower-mode" onchange="sendBlowerControl()">
+                        <option value="AUTO">AUTO</option>
+                        <option value="MANUAL">MANUAL</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Blower PWM (%)</label>
+                    <div class="control-row">
+                        <input type="range" id="input-blower-pwm" min="0" max="100" step="1" value="0" oninput="syncControlValue('blower'); sendBlowerControl()">
+                        <input type="number" id="input-blower-pwm-num" min="0" max="100" step="1" value="0" oninput="syncControlValue('blower', true); sendBlowerControl()">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER: DYNAMICS & THERMALS -->
+        <div class="center-column">
+            
+            <div class="panel">
+                <div class="panel-title">Kinematics & Flow</div>
+                <div class="gauges-grid-2" id="gauges-group-1"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">System Load</div>
+                <div class="gauges-grid-2" id="gauges-group-2"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title" style="display: flex; justify-content: space-between;">
+                    Thermal Status
+                    <span style="color: var(--text-muted); font-size: 0.85rem; text-transform: none;">
+                        Ambient: <span id="val-ambient" style="color: var(--text-dark); font-family: var(--font-num); font-size: 1.1rem;">25.0</span> °C
+                    </span>
+                </div>
+                <div id="thermal-bars-container" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: BATTERY & PANELS -->
+        <div class="panel" style="background: transparent; border: none; padding: 0; box-shadow: none; gap: 15px;">
+            
+            <div class="panel" style="padding: 10px;">
+                <div class="panel-title">BMS Telemetry</div>
+                <div class="bms-grid">
+                    <div class="bms-val"><span id="bms-volts">--</span><small>VOLTAGE (V)</small></div>
+                    <div class="bms-val"><span id="bms-soc">--</span><small>CHARGE (%)</small></div>
+                    <div class="bms-val"><span id="bms-temp">--</span><small>TEMP (°C)</small></div>
+                    <div class="bms-val"><span id="bms-time">--</span><small>TIME REM (MIN)</small></div>
+                </div>
+                <div class="bms-status bg-ac" id="bms-status-text">WAITING FOR DATA</div>
+                <div class="ac-btn-group">
+                    <button class="btn" style="background: var(--text-dark); color: #fff;" onclick="sendSimControl('ac_connect')">🔌 PLUG AC</button>
+                    <button class="btn" style="background: var(--text-muted); color: #fff;" onclick="sendSimControl('ac_disconnect')">🔋 UNPLUG</button>
+                </div>
+            </div>
+
+            <div class="panel expandable" onclick="this.classList.toggle('open')">
+                <div class="panel-title">System Drain (LPM) <span style="float:right; font-size:0.7rem; color: var(--primary);">▼</span></div>
+                <div class="big-val" id="val-drain-total">0.00</div>
+                <div class="breakdown" id="drain-breakdown"></div>
+            </div>
+
+            <div class="panel expandable" onclick="this.classList.toggle('open')">
+                <div class="panel-title">Total APU Drop (kPa) <span style="float:right; font-size:0.7rem; color: var(--primary);">▼</span></div>
+                <div class="big-val" id="val-pd-total">0.0</div>
+                <div class="breakdown" id="pd-breakdown"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- NEW DATA EXPLORER MODAL -->
+    <div id="analytics-modal" class="modal-overlay">
+        <div class="modal-header">
+            <div class="modal-title">
+                <div class="modal-title-pulse"></div>
+                Trend Analysis (Paused for Review)
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="exportCSV()">📥 Export CSV</button>
+                <button class="btn btn-red" onclick="closeAnalytics()">✕ Close & Resume</button>
+            </div>
+        </div>
+        <div class="modal-content">
+            <!-- Charts are grouped into 2 columns automatically by grid -->
+            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-flow"></canvas></div></div>
+            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-pressure"></canvas></div></div>
+            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-motor"></canvas></div></div>
+            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-thermal"></canvas></div></div>
+            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-electrical"></canvas></div></div>
+            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-control"></canvas></div></div>
+        </div>
+    </div>
+
+    <!-- =========================================
+         JAVASCRIPT LOGIC
+         ========================================= -->
+    <script>
+        const CONFIG = {
+            WS_URL: 'ws://localhost:8765',
+            RECONNECT_MS: 2000,
+            LIVE_WINDOW_SECONDS: 30, 
+            
+            GAUGES: {
+                flow:  { id: 'flow', label: 'Flow Delivered', unit: 'LPM', range: [0, 120], redline: 112, ticks: 20, target: 'gauges-group-1' },
+                rpm:   { id: 'rpm', label: 'Motor Speed', unit: 'RPM', range: [0, 3000], redline: 2800, ticks: 500, target: 'gauges-group-1' },
+                tank:  { id: 'tank', label: 'Tank Pressure', unit: 'bar', range: [0, 7], redline: 6.25, ticks: 1, target: 'gauges-group-2' },
+                power: { id: 'power', label: 'Power Draw', unit: 'W', range: [0, 800], redline: 750, ticks: 100, target: 'gauges-group-2' }
+            },
+
+            PRESETS: {
+                "VCV - Adult":     { flow: 40.0, exp_flow: 0.0, ti: 1.0, te: 2.0 },
+                "VCV - Pediatric": { flow: 15.0, exp_flow: 0.0, ti: 0.8, te: 1.5 },
+                "PCV - Adult":     { flow: 50.0, exp_flow: 2.0, ti: 1.2, te: 2.4 }
+            }
+        };
+
+        let ws = null;
+        let viewMode = 'LIVE'; // LIVE scrolls automatically, REVIEW pauses scrolling for analysis
+        let lastTimestamp = 0;
+        let updatePending = false;
+        
+        const history = {
+            t: [], flow_target: [], flow_del: [], tank_p: [],
+            rpm: [], power: [], soc: [], pwm: [], total_drain: [], total_pd: [],
+            motor_temp: [], head_temp: [], battery_voltage: [], battery_derating: [], battery_fan_pwm: [], pump_command_pwm: []
+        };
+
+        const DOM = {
+            statusIndicator: document.getElementById('conn-status'),
+            statusText: document.getElementById('conn-text'),
+            clock: document.getElementById('sim-clock'),
+            dispMode: document.getElementById('disp-mode-name'),
+            dispFlow: document.getElementById('disp-mode-flow'),
+            dispIE: document.getElementById('disp-mode-ie')
+        };
+
+        function connectWS() {
+            updateStatus('connecting');
+            ws = new WebSocket(CONFIG.WS_URL);
+            
+            ws.onopen = () => updateStatus('live');
+            ws.onclose = () => { updateStatus('disconnected'); setTimeout(connectWS, CONFIG.RECONNECT_MS); };
+            ws.onerror = () => ws.close();
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                processIncomingData(data);
+                // If sim stops while viewing live, stay live (or change based on preference)
+            };
+        }
+
+        function updateStatus(state) {
+            DOM.statusIndicator.className = `status-indicator ${state}`;
+            DOM.statusText.innerText = state.toUpperCase();
+        }
+
+        function sendWS(obj) {
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+        }
+
+        function processIncomingData(d) {
+            history.t.push(d.t);
+            history.flow_target.push(d.mode.flowrate_target_lpm);
+            history.flow_del.push(d.flowrate_delivered_lpm);
+            history.tank_p.push(d.tank_pressure_bar ?? d.tank_pressure_kpa);
+            history.rpm.push(d.motor.rpm);
+            history.power.push(d.motor.power_w);
+            history.soc.push(d.battery.soc_pct);
+            history.pwm.push(d.blower_pwm_pct);
+            history.total_drain.push(d.drain.total_lpm);
+            history.total_pd.push(d.pressure_drop.total_kpa);
+            history.motor_temp.push(d.motor.temp_c);
+            history.head_temp.push(d.pump_head_temp_c);
+            history.battery_voltage.push(d.battery.voltage_v);
+            history.battery_derating.push(d.battery.derating_multiplier * 100.0);
+            history.battery_fan_pwm.push(d.battery.fan_pwm);
+            history.pump_command_pwm.push(d.control ? d.control.pump_command_pwm_pct : (d.motor.rpm / 3000.0) * 100.0);
+
+            lastTimestamp = d.t;
+
+            if (!updatePending) {
+                updatePending = true;
+                requestAnimationFrame(() => { updateUI(d); updateCharts(); updatePending = false; });
+            }
+        }
+
+        function formatTime(secs) {
+            const m = Math.floor(secs / 60).toString().padStart(2, '0');
+            const s = Math.floor(secs % 60).toString().padStart(2, '0');
+            const ms = Math.floor((secs % 1) * 1000).toString().padStart(3, '0');
+            return `${m}:${s}.${ms}`;
+        }
+
+        function updateUI(d) {
+            DOM.clock.innerText = formatTime(d.t);
+            DOM.dispMode.innerText = d.mode.name;
+            DOM.dispFlow.innerText = d.mode.flowrate_target_lpm.toFixed(1);
+            DOM.dispIE.innerText = `${d.mode.ti_s.toFixed(1)}:${d.mode.te_s.toFixed(1)}`;
+
+            updateGauge('flow', d.flowrate_delivered_lpm, d.mode.flowrate_target_lpm);
+            updateGauge('rpm', d.motor.rpm);
+            updateGauge('tank', d.tank_pressure_bar ?? d.tank_pressure_kpa);
+            updateGauge('power', d.motor.power_w);
+
+            const ambient = d.ambient_temp_c || 25.0; 
+            document.getElementById('val-ambient').innerText = ambient.toFixed(1);
+
+            renderThermalBars([
+                { id: 'head', label: 'Head Temp', val: d.pump_head_temp_c, max: 120, warn: 80, crit: 95 },
+                { id: 'motor', label: 'Motor Temp', val: d.motor.temp_c, max: 120, warn: 85, crit: 100 },
+                { id: 'battery', label: 'Batt Temp', val: d.battery.temp_c, max: 80, warn: 45, crit: 55 }
+            ]);
+
+            document.getElementById('bms-volts').innerText = d.battery.voltage_v.toFixed(1);
+            const soc = document.getElementById('bms-soc');
+            soc.innerText = d.battery.soc_pct.toFixed(0);
+            soc.className = d.battery.soc_pct > 20 ? 'c-ok' : 'c-crit';
+            
+            const bmsTemp = document.getElementById('bms-temp');
+            bmsTemp.innerText = d.battery.temp_c.toFixed(1);
+            bmsTemp.className = d.battery.temp_c < 45 ? '' : 'c-crit';
+
+            document.getElementById('bms-time').innerText = d.battery.time_remaining_min > 999 ? '∞' : d.battery.time_remaining_min.toFixed(0);
+            
+            const bmsText = document.getElementById('bms-status-text');
+            bmsText.innerText = d.battery.status;
+            if (d.battery.status.includes("AC Connected") || d.battery.status.includes("Charging")) {
+                bmsText.className = "bms-status bg-ac";
+            } else if (d.battery.soc_pct <= 15) {
+                bmsText.className = "bms-status bg-crit";
+            } else {
+                bmsText.className = "bms-status bg-alert";
+            }
+
+            document.getElementById('val-drain-total').innerText = d.drain.total_lpm.toFixed(2);
+            renderBars('drain-breakdown', [
+                { label: 'Air Filt', val: d.drain.air_filter_lpm, max: 2.0 },
+                { label: 'Water Sep', val: d.drain.water_separator_lpm, max: 2.0 },
+                { label: 'Mist Sep', val: d.drain.mist_separator_lpm, max: 2.0 }
+            ]);
+
+            document.getElementById('val-pd-total').innerText = d.pressure_drop.total_kpa.toFixed(1);
+            renderBars('pd-breakdown', [
+                { label: 'HEPA', val: d.pressure_drop.hepa_kpa, max: 5.0 },
+                { label: 'Post Pump', val: d.pressure_drop.post_pump_kpa, max: 20.0 },
+                { label: 'Hose', val: d.pressure_drop.hose_kpa, max: 3.0 },
+                { label: 'Coil', val: d.pressure_drop.cooling_coil_kpa, max: 5.0 },
+                { label: 'Air Filt', val: d.pressure_drop.air_filter_kpa, max: 3.0 },
+                { label: 'Water Sep', val: d.pressure_drop.water_separator_kpa, max: 3.0 },
+                { label: 'Mist Sep', val: d.pressure_drop.mist_separator_kpa, max: 3.0 }
+            ]);
+        }
+
+        function renderThermalBars(items) {
+            const container = document.getElementById('thermal-bars-container');
+            if (container.children.length === 0) {
+                let html = '';
+                items.forEach(item => {
+                    html += `
+                        <div class="temp-row">
+                            <div class="temp-label">${item.label}</div>
+                            <div class="temp-track"><div class="temp-fill" id="t-fill-${item.id}"></div></div>
+                            <div class="temp-val" id="t-val-${item.id}">0.0</div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            }
+
+            items.forEach(item => {
+                const valEl = document.getElementById(`t-val-${item.id}`);
+                const fillEl = document.getElementById(`t-fill-${item.id}`);
+                if (!valEl || !fillEl) return;
+
+                valEl.innerText = item.val.toFixed(1) + '°';
+                const pct = Math.min(100, Math.max(0, (item.val / item.max) * 100));
+                fillEl.style.width = pct + '%';
+
+                if (item.val >= item.crit) {
+                    fillEl.style.backgroundColor = 'var(--crit-red)';
+                } else if (item.val >= item.warn) {
+                    fillEl.style.backgroundColor = 'var(--alert-amber)';
+                } else {
+                    fillEl.style.backgroundColor = 'var(--ok-green)';
+                }
+            });
+        }
+
+        function renderBars(containerId, items) {
+            const container = document.getElementById(containerId);
+            let html = '';
+            items.forEach(item => {
+                const pct = Math.min(100, Math.max(0, (item.val / item.max) * 100));
+                html += `
+                    <div class="bar-row">
+                        <div class="bar-label">${item.label}</div>
+                        <div class="bar-track"><div class="bar-fill" style="width: ${pct}%"></div></div>
+                        <div class="bar-val">${item.val.toFixed(1)}</div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function loadPreset() {
+            const sel = document.getElementById('input-preset').value;
+            if (CONFIG.PRESETS[sel]) {
+                const p = CONFIG.PRESETS[sel];
+                document.getElementById('input-flow').value = p.flow;
+                document.getElementById('input-exp-flow').value = p.exp_flow;
+                document.getElementById('input-ti').value = p.ti;
+                document.getElementById('input-te').value = p.te;
+            }
+        }
+
+        function markCustom() { document.getElementById('input-preset').value = "Custom"; }
+
+        function sendNewMode() {
+            const name = document.getElementById('input-preset').value;
+            const flow = parseFloat(document.getElementById('input-flow').value);
+            const exp_flow = parseFloat(document.getElementById('input-exp-flow').value);
+            const ti = parseFloat(document.getElementById('input-ti').value);
+            const te = parseFloat(document.getElementById('input-te').value);
+            sendWS({ type: "set_mode", name: name, flowrate_target_lpm: flow, flowrate_exp_lpm: exp_flow, ti_s: ti, te_s: te });
+        }
+
+        function sendSimControl(action) { sendWS({ type: "sim_control", action }); }
+
+        function sendSimSpeed() {
+            const input = document.getElementById('input-sim-speed');
+            const value = Math.max(0.1, Number(input.value) || 1.0);
+            input.value = value;
+            sendWS({ type: "set_sim_speed", multiplier: value });
+        }
+
+        function clampPct(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return 0;
+            return Math.min(100, Math.max(0, n));
+        }
+
+        function syncControlValue(kind, fromNumber=false) {
+            const slider = document.getElementById(`input-${kind}-pwm`);
+            const num = document.getElementById(`input-${kind}-pwm-num`);
+            const value = clampPct(fromNumber ? num.value : slider.value);
+            slider.value = value;
+            num.value = value;
+        }
+
+        function sendPumpControl() {
+            syncControlValue('pump');
+            sendWS({
+                type: "set_pump_control",
+                mode: document.getElementById('input-pump-mode').value,
+                command_mode: document.getElementById('input-pump-command-mode').value,
+                pwm_pct: clampPct(document.getElementById('input-pump-pwm').value),
+                target_rpm: Math.max(0, Number(document.getElementById('input-pump-rpm').value) || 0)
+            });
+        }
+
+        function updatePumpCommandUI() {
+            const commandMode = document.getElementById('input-pump-command-mode').value;
+            document.getElementById('pump-rpm-control').style.display = commandMode === 'RPM' ? 'flex' : 'none';
+        }
+
+        function sendBlowerControl() {
+            syncControlValue('blower');
+            sendWS({
+                type: "set_blower_control",
+                mode: document.getElementById('input-blower-mode').value,
+                pwm_pct: clampPct(document.getElementById('input-blower-pwm').value)
+            });
+        }
+
+        /* =========================================
+           MOTORSPORTS NEEDLE GAUGES
+           ========================================= */
+        const gaugesData = {};
+
+        function initGauges() {
+            Object.values(CONFIG.GAUGES).forEach(g => {
+                gaugesData[g.id] = { ...g };
+                const container = document.getElementById(g.target);
+                if (container) {
+                    container.innerHTML += buildGaugeHTML(g);
+                }
+            });
+        }
+
+        function polarToCartesian(cx, cy, r, angleDeg) {
+            const rad = (angleDeg - 90) * Math.PI / 180.0;
+            return { x: cx + (r * Math.cos(rad)), y: cy + (r * Math.sin(rad)) };
+        }
+        
+        function describeArc(cx, cy, r, startAngle, endAngle) {
+            const start = polarToCartesian(cx, cy, r, endAngle);
+            const end = polarToCartesian(cx, cy, r, startAngle);
+            const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+            return ["M", start.x, start.y, "A", r, r, 0, largeArcFlag, 0, end.x, end.y].join(" ");
+        }
+
+        function buildGaugeHTML(g) {
+            const cx = 100, cy = 100, r = 80;
+            const track = `<path d="${describeArc(cx, cy, r, -135, 135)}" fill="none" stroke="var(--border-color)" stroke-width="12" stroke-linecap="round"/>`;
+            
+            let redlinePath = "";
+            if (g.redline !== undefined) {
+                const range = g.range[1] - g.range[0];
+                const angle = -135 + ((g.redline - g.range[0]) / range) * 270;
+                redlinePath = `<path d="${describeArc(cx, cy, r, angle, 135)}" fill="none" stroke="rgba(239, 68, 68, 0.25)" stroke-width="12" stroke-linecap="round"/>`;
+            }
+
+            let ticks = "";
+            for(let v=g.range[0]; v<=g.range[1]; v+=g.ticks) {
+                const angle = -135 + ((v - g.range[0]) / (g.range[1]-g.range[0])) * 270;
+                const p1 = polarToCartesian(cx, cy, r-15, angle);
+                const p2 = polarToCartesian(cx, cy, r-2, angle);
+                ticks += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round"/>`;
+            }
+
+            return `
+                <div class="gauge-container">
+                    <svg viewBox="0 0 200 180" class="gauge-svg">
+                        ${track}
+                        ${redlinePath}
+                        ${ticks}
+                        <polygon id="g-${g.id}-target" points="95,12 105,12 100,22" fill="var(--primary)" style="display:none; transform-origin: 100px 100px;" />
+                        
+                        // <path id="g-${g.id}-fill" fill="none" stroke="var(--primary)" stroke-width="12" stroke-linecap="round" style="transition: d 0.05s linear;" d=""/>
+                        <path id="g-${g.id}-fill" fill="none" stroke="var(--primary)" stroke-width="12" stroke-linecap="round" d=""/>
+                        <g id="g-${g.id}-needle-group" style="transform-origin: 100px 100px; transform: rotate(-135deg); transition: transform 0.08s cubic-bezier(0.2, 1, 0.3, 1);">
+                            <polygon points="96,102 104,102 100,20" fill="rgba(0,0,0,0.1)" />
+                            <polygon points="97,100 103,100 100,18" fill="var(--crit-red)" />
+                            <circle cx="100" cy="100" r="8" fill="var(--text-dark)" />
+                            <circle cx="100" cy="100" r="3" fill="#ffffff" />
+                        </g>
+                    </svg>
+                    <div class="gauge-val" id="g-${g.id}-val">0</div>
+                    <div class="gauge-label">${g.label} (${g.unit})</div>
+                </div>
+            `;
+        }
+
+        function updateGauge(id, val, targetVal=null) {
+            const g = gaugesData[id];
+            const range = g.range[1] - g.range[0];
+            const clamped = Math.min(Math.max(val, g.range[0]), g.range[1]);
+            
+            const decimals = g.unit === 'bar' ? 1 : 0;
+            document.getElementById(`g-${id}-val`).innerText = val.toFixed(decimals);
+
+            let color = 'var(--primary)';
+            if (g.redline !== undefined && clamped >= g.redline) {
+                color = 'var(--crit-red)';
+            }
+
+            const endAngle = -135 + ((clamped - g.range[0]) / range) * 270;
+            
+            const path = document.getElementById(`g-${id}-fill`);
+            if (endAngle > -134.9) { 
+                path.setAttribute('d', describeArc(100, 100, 80, -135, endAngle));
+                path.setAttribute('stroke', color);
+            } else {
+                path.setAttribute('d', '');
+            }
+
+            document.getElementById(`g-${id}-needle-group`).style.transform = `rotate(${endAngle}deg)`;
+
+            if (targetVal !== null) {
+                const targetMarker = document.getElementById(`g-${id}-target`);
+                targetMarker.style.display = 'block';
+                const targetAngle = -135 + ((targetVal - g.range[0]) / range) * 270;
+                targetMarker.style.transform = `rotate(${targetAngle}deg)`;
+            }
+        }
+
+        /* =========================================
+           CHARTS & MODAL LOGIC
+           ========================================= */
+        const charts = {};
+        const chartOptions = {
+            responsive: true, maintainAspectRatio: false, animation: false, 
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#1E293B', font: { family: "'Rajdhani', sans-serif", weight: 'bold' } } },
+                zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } }
+            },
+            scales: {
+                x: { type: 'linear', grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => formatTime(v) } },
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b' } }
+            }
+        };
+
+        function initCharts() {
+            Chart.defaults.color = '#1E293B';
+            Chart.defaults.font.family = "'Rajdhani', sans-serif";
+
+            charts.flow = new Chart(document.getElementById('chart-flow'), {
+                type: 'line',
+                data: { datasets: [
+                    { label: 'Flow (Delivered)', data: [], borderColor: '#0066CC', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+                    { label: 'Flow (Target)', data: [], borderColor: '#F59E0B', borderWidth: 2, borderDash: [5,5], pointRadius: 0, tension: 0 }
+                ]},
+                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Flow (LPM)', color: '#64748b', font:{weight:'bold'} } } }
+            });
+
+            charts.pressure = new Chart(document.getElementById('chart-pressure'), {
+                type: 'line',
+                data: { datasets: [ { label: 'Tank Pressure', data: [], borderColor: '#10B981', borderWidth: 2, pointRadius: 0, tension: 0.1 } ] },
+                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Pressure (bar)', color: '#64748b', font:{weight:'bold'} } } }
+            });
+
+            charts.motor = new Chart(document.getElementById('chart-motor'), {
+                type: 'line',
+                data: { datasets: [
+                    { label: 'Batt SOC %', data: [], yAxisID: 'y1', borderColor: '#F59E0B', borderWidth: 2, pointRadius: 0 },
+                    { label: 'RPM', data: [], yAxisID: 'y', borderColor: '#1E293B', borderWidth: 2, pointRadius: 0 }
+                ]},
+                options: { ...chartOptions, scales: { x: chartOptions.scales.x, y: { type: 'linear', position: 'left', grid: { color: '#e2e8f0' } }, y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, min: 0, max: 100 } } }
+            });
+
+            charts.thermal = new Chart(document.getElementById('chart-thermal'), {
+                type: 'line',
+                data: { datasets: [
+                    { label: 'Motor Temp', data: [], borderColor: '#EF4444', borderWidth: 2, pointRadius: 0 },
+                    { label: 'Head Temp', data: [], borderColor: '#F59E0B', borderWidth: 2, pointRadius: 0 }
+                ]},
+                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Thermal (deg C)', color: '#64748b', font:{weight:'bold'} } } }
+            });
+
+            charts.electrical = new Chart(document.getElementById('chart-electrical'), {
+                type: 'line',
+                data: { datasets: [
+                    { label: 'Power W', data: [], yAxisID: 'y', borderColor: '#1E293B', borderWidth: 2, pointRadius: 0 },
+                    { label: 'Battery V', data: [], yAxisID: 'y1', borderColor: '#0066CC', borderWidth: 2, pointRadius: 0 },
+                    { label: 'Derating %', data: [], yAxisID: 'y2', borderColor: '#10B981', borderWidth: 2, pointRadius: 0 }
+                ]},
+                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Electrical / Derating', color: '#64748b', font:{weight:'bold'} } }, scales: { x: chartOptions.scales.x, y: { type: 'linear', position: 'left', grid: { color: '#e2e8f0' } }, y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, min: 18, max: 28 }, y2: { type: 'linear', display: false, min: 0, max: 100 } } }
+            });
+
+            charts.control = new Chart(document.getElementById('chart-control'), {
+                type: 'line',
+                data: { datasets: [
+                    { label: 'Pump Cmd %', data: [], borderColor: '#0066CC', borderWidth: 2, pointRadius: 0 },
+                    { label: 'Blower PWM %', data: [], borderColor: '#F59E0B', borderWidth: 2, pointRadius: 0 },
+                    { label: 'Battery Fan %', data: [], borderColor: '#10B981', borderWidth: 2, pointRadius: 0 }
+                ]},
+                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Control Outputs (%)', color: '#64748b', font:{weight:'bold'} } }, scales: { x: chartOptions.scales.x, y: { min: 0, max: 100, grid: { color: '#e2e8f0' } } } }
+            });
+        }
+
+        function updateCharts() {
+            if (history.t.length === 0) return;
+            const ts = history.t;
+            
+            charts.flow.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.flow_del[i]}));
+            charts.flow.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.flow_target[i]}));
+            charts.pressure.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.tank_p[i]}));
+            charts.motor.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.soc[i]}));
+            charts.motor.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.rpm[i]}));
+            charts.thermal.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.motor_temp[i]}));
+            charts.thermal.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.head_temp[i]}));
+            charts.electrical.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.power[i]}));
+            charts.electrical.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.battery_voltage[i]}));
+            charts.electrical.data.datasets[2].data = ts.map((t, i) => ({x: t, y: history.battery_derating[i]}));
+            charts.control.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.pump_command_pwm[i]}));
+            charts.control.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.pwm[i]}));
+            charts.control.data.datasets[2].data = ts.map((t, i) => ({x: t, y: history.battery_fan_pwm[i]}));
+
+            // Only snap to the latest window if we are NOT in review mode
+            if (viewMode === 'LIVE') {
+                const maxT = lastTimestamp;
+                const minT = Math.max(0, maxT - CONFIG.LIVE_WINDOW_SECONDS);
+                Object.values(charts).forEach(c => {
+                    c.options.scales.x.min = minT; c.options.scales.x.max = maxT; c.update('none'); 
+                });
+            } else {
+                Object.values(charts).forEach(c => c.update('none'));
+            }
+        }
+
+        // MODAL CONTROLS
+        function openAnalytics() {
+            document.getElementById('analytics-modal').classList.add('open');
+            viewMode = 'REVIEW'; // Pause scrolling
+            
+            // Release the fixed time window so you can see all historical data
+            Object.values(charts).forEach(c => { 
+                c.options.scales.x.min = undefined; 
+                c.options.scales.x.max = undefined; 
+                c.resize(); // Force resize inside new container
+                c.update(); 
+            });
+        }
+
+        function closeAnalytics() {
+            document.getElementById('analytics-modal').classList.remove('open');
+            viewMode = 'LIVE'; // Resume scrolling
+            
+            // Snap back to the current live window
+            Object.values(charts).forEach(c => { if (c.resetZoom) c.resetZoom(); });
+        }
+
+        function exportCSV() {
+            if (history.t.length === 0) return;
+            const headers = ['t', 'flow_target', 'flow_del', 'tank_p_bar', 'rpm', 'power', 'soc', 'pwm', 'total_drain', 'total_pd', 'motor_temp', 'head_temp', 'battery_voltage', 'battery_derating_pct', 'battery_fan_pwm', 'pump_command_pwm'];
+            const rows = [headers.join(',')];
+            for (let i = 0; i < history.t.length; i++) {
+                rows.push([history.t[i], history.flow_target[i], history.flow_del[i], history.tank_p[i], history.rpm[i], history.power[i], history.soc[i], history.pwm[i], history.total_drain[i], history.total_pd[i], history.motor_temp[i], history.head_temp[i], history.battery_voltage[i], history.battery_derating[i], history.battery_fan_pwm[i], history.pump_command_pwm[i]].join(','));
+            }
+            const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', ''); a.setAttribute('href', url); a.setAttribute('download', `telemetry_${new Date().getTime()}.csv`);
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        window.onload = () => { initGauges(); initCharts(); updatePumpCommandUI(); connectWS(); };
+    </script>
+</body>
+</html>
