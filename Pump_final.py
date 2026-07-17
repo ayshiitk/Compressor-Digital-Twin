@@ -1,4 +1,9 @@
 import numpy as np
+import Intake_hose as ih
+import Hepa as hf
+import Cabinet_filter as cf
+import Silencer as sl
+
 
 class SmartCompressor:
     """
@@ -48,13 +53,9 @@ class SmartCompressor:
         self.rho_normal = 1.204       # Density of air at 20°C and 1 ATM (kg/m^3)
         self.cp_air = 1005.0          # Specific heat of air at constant pressure (J/kg·K)
         
-        # Thermal Capacitance (Mass * Specific Heat) in Joules/Kelvin
-        # self.Cth_motor = 1513.4       # Blended mass of Steel casing + Copper Stator
-        # self.Cth_head = 1413.0        # Mass of AL6061 and ADC12 Aluminum Heads
-        
         # Safety Throttling Limits (Kelvin)
-        self.motor_limit_k = 273.15 + 85.0          # Absolute max safe temp (75°C)
-        self.motor_throttle_start_k = 273.15 + 75.0 # Start reducing power here (65°C)
+        self.motor_limit_k = 273.15 + 85.0          # Absolute max safe temp (85°C)
+        self.motor_throttle_start_k = 273.15 + 75.0 # Start reducing power here (75°C)
 
         # Dynamic State Variables (Initialize at Room Temperature)
         self.temp_ambient_k = 293.15
@@ -62,112 +63,11 @@ class SmartCompressor:
         self.temp_head_k = 293.15
         self.voltage_v = 24.0
 
-        self.flow_curve = np.polyfit( self.raw_pressure_bar, self.raw_flow_nlpm, 2)
+        self.flow_curve = np.polyfit(self.raw_pressure_bar, self.raw_flow_nlpm, 2)
         self.current_curve = np.polyfit(self.raw_pressure_bar, self.raw_current_amps, 3)
 
         # Run the auto-calibration based on the physical test data below
         self._run_empirical_calibration()
-
-
-    # def _run_empirical_calibration(self):
-    #     """
-    #     Reads the raw test data provided by the user, calculates the dynamic 
-    #     Thermal Resistances (Rth), and calibrates the internal cooling Effectiveness.
-    #     """
-        
-    #     # =====================================================================
-    #     # TEST 1: THE MULTIMETER TEST (Copper Resistance)
-    #     # Action: Turn pump OFF. Measure resistance across power wires with a multimeter.
-    #     # Note: Run pump until hot, turn off, and immediately measure to get "Hot" resistance.
-    #     # =====================================================================
-    #     self.R_coil_hot_ohms = 0.45 
-        
-
-    #     # =====================================================================
-    #     # TEST 2: THE MOTOR COOLING TEST (Free-Spin / 0 Bar)
-    #     # Action: Remove hoses (0 Bar). Run pump at different PWM speeds. 
-    #     # Wait 15 mins for temps to steady. Record Amps, Room Temp, and Motor Temp.
-    #     # =====================================================================
-    #     test2_motor_pwm = np.array([0.25, 0.50, 0.75, 1.00])
-    #     test2_amps = np.array([1.0 , 2.20, 4.0, 6.8])        
-    #     test2_temp_motor_c = np.array([40.0, 42.0, 44.2, 48.5])     
-    #     test2_temp_room_c = np.array([33.0, 33.0, 33.0, 33.0])
-    #     test2_Voltage = np.array([26.1, 26.1, 26.1, 26.05])
-
-
-    #     # Add the motor temps from your spreadsheet into Test 3
-    #     test3_temp_motor_c = np.array([57.5, 60.5, 62.0]) # Example data from your white cells
-    #     motor_Rth_load_values = np.zeros(len(test3_blower_cfm))
-
-        
-    #     # Math: I^2R exactly calculates motor heat without guessing efficiency
-    #     motor_heat_watts = (test2_amps ** 2) * self.R_coil_hot_ohms
-    #     motor_Rth_values = (test2_temp_motor_c - test2_temp_room_c) / motor_heat_watts
-        
-    #     # Create a curve so the software knows Rth for ANY requested PWM
-    #     self.motor_Rth_curve = np.polyfit(test2_motor_pwm, motor_Rth_values, 2)
-
-
-    #     # =====================================================================
-    #     # TEST 3: THE HEAD COOLING TEST (Full Load / 4 Bar)
-    #     # Action: Attach hoses. Set back-pressure to 4 Bar. Run external blower at 
-    #     # different speeds (CFM). Wait 15 mins. Record Head Temp and the ACTUAL 
-    #     # temperature of the air shooting out of the discharge hose.
-    #     # =====================================================================
-
-    #     # Blower CFM estimated from Sheet "Blower Characteristics": 100% → 6820 RPM ≈ 53.6 CFM
-    #     # 80% → ~6250 RPM, scaled → 49 CFM; 65% → ~4850 RPM → 38 CFM
-    #     test3_blower_cfm    = np.array([38.0, 49.0, 53.6])
-    #     test3_amps          = np.array([15.33, 15.33, 18.86])     # from FA120 rows 8, 11, 7
-    #     test3_pressure_bar  = np.array([2.5,   2.5,   2.5])
-    #     test3_temp_head_c   = np.array([63.5,  65.0,  69.5])      # avg of rear+front
-    #     test3_temp_room_c   = np.array([27.5,  27.5,  27.5])
-    #     test3_temp_gas_out_c= np.array([54.0,  54.0,  58.0])      # T_coil_inlet column
-
-    #     head_Rth_values = np.zeros(len(test3_blower_cfm))
-    #     epsilon_values = np.zeros(len(test3_blower_cfm))
-        
-    #     for i in range(len(test3_blower_cfm)):
-    #         # 1. Flow Kinematics
-    #         delta_p_bar = max(0.0, test3_pressure_bar[i] - 1.0) 
-    #         flow_nlpm = max(0.0, np.polyval(self.flow_curve, delta_p_bar))
-    #         mass_flow_kg_s = ((flow_nlpm / 1000.0) / 60.0) * self.rho_normal
-            
-    #         # 2. Convert temperatures to Kelvin for thermodynamic math
-    #         t_in_k = test3_temp_room_c[i] + 273.15
-    #         t_head_k = test3_temp_head_c[i] + 273.15
-    #         t_gas_out_k = test3_temp_gas_out_c[i] + 273.15
-            
-    #         # 3. Calculate Isentropic Peak Temperature (The theoretical maximum)
-
-    #         p_down_abs = (test3_pressure_bar[i] + 1.01325) * 1e5  # Pa absolute
-    #         p_up_abs   = 1.01325e5                                  # atmospheric intake
-    #         pressure_ratio = p_down_abs / p_up_abs                  # → 3.47, not 2.5
-    #         t_peak_k = t_in_k * (pressure_ratio ** ((self.gamma - 1.0) / self.gamma))
-            
-    #         # 4. Calibrate Effectiveness (Epsilon)
-    #         # Epsilon = How closely the gas cooled down to match the metal head temp
-    #         if (t_peak_k - t_head_k) > 0:
-    #             epsilon_values[i] = (t_peak_k - t_gas_out_k) / (t_peak_k - t_head_k)
-    #         else:
-    #             epsilon_values[i] = 0.0
-                
-    #         # 5. FIRST LAW ENTHALPY BALANCE (Isolating exactly how much heat hit the metal)
-    #         total_elec_power_w = 24.0 * test3_amps[i]
-    #         motor_heat_w = (test3_amps[i] ** 2) * self.R_coil_hot_ohms
-    #         gas_enthalpy_w = mass_flow_kg_s * self.cp_air * (t_gas_out_k - t_in_k)
-            
-    #         # Head Friction = Everything left over after motor heat and gas heat escape
-    #         head_friction_heat_w = max(0.0, total_elec_power_w - motor_heat_w - gas_enthalpy_w)
-            
-    #         # Calculate Head Thermal Resistance
-    #         head_Rth_values[i] = (test3_temp_head_c[i] - test3_temp_room_c[i]) / max(0.1, head_friction_heat_w)
-            
-    #     # Store the calculated curves and average epsilon
-    #     self.head_Rth_curve = np.polyfit(test3_blower_cfm, head_Rth_values, 2)
-    #     self.epsilon_head = np.clip(np.mean(epsilon_values), 0.0, 1.0)
-
-
 
     def _run_empirical_calibration(self):
         """
@@ -180,7 +80,6 @@ class SmartCompressor:
         # =====================================================================
         self.R_coil_hot_ohms = 0.45 
         
-
         # =====================================================================
         # TEST 2: THE MOTOR COOLING TEST (Free-Spin / 0 Bar)
         # Note: We calculate this, but it is ONLY accurate for 0 Bar without external fans.
@@ -194,25 +93,30 @@ class SmartCompressor:
         free_spin_heat_watts = (test2_amps ** 2) * self.R_coil_hot_ohms
         free_spin_Rth_values = (test2_temp_motor_c - test2_temp_room_c) / free_spin_heat_watts
 
-
         # =====================================================================
-        # TEST 3: THE EXTERNAL BLOWER COOLING TEST (Full Load / 2.5 Bar)
-        # Action: Attach hoses. Set back-pressure to 2.5 Bar. Run external blower.
-        # This calculates how well BOTH the Head and the Motor cool under real load.
+        # TEST 3: THE EXTERNAL BLOWER COOLING TEST (Full Load / TWO BLOWERS)
+        # Anchor Point 3 uses actual test data: 2.71 Bar, 17.39 A, 100% Blower (x2)
         # =====================================================================
-        test3_blower_cfm    = np.array([38.0, 49.0, 53.6])
-        test3_amps          = np.array([15.33, 15.33, 18.86])     
-        test3_pressure_bar  = np.array([2.5,   2.5,   2.5])
+        # Scaled for 2 blowers
+        test3_blower_cfm    = np.array([76.0, 98.0, 107.2]) 
         
-        # Head Temperatures
-        test3_temp_head_c   = np.array([63.5,  65.0,  69.5])      
-        test3_temp_gas_out_c= np.array([54.0,  54.0,  58.0])      
+        # Updated with 17.39 Amps at max load
+        test3_amps          = np.array([15.33, 15.33, 17.39])     
         
-        # NEW: Motor Temperatures from your spreadsheet (120RND white cells)
-        # Put your exact motor shell temperatures here
-        test3_temp_motor_c  = np.array([57.0,  58.5,  60.5]) 
+        # Updated with 2.71 Bar back-pressure
+        test3_pressure_bar  = np.array([2.5,   2.5,   2.71])
         
-        test3_temp_room_c   = np.array([27.5,  27.5,  27.5])
+        # Updated with average of Rear (66.6) and Front (61.4) Head Temps
+        test3_temp_head_c   = np.array([63.5,  65.0,  64.0])      
+        
+        # Updated with actual stable Motor Temp
+        test3_temp_motor_c  = np.array([57.0,  58.5,  62.2]) 
+        
+        # Updated with actual Room Temp
+        test3_temp_room_c   = np.array([27.5,  27.5,  26.8])
+        
+        # Gas Out temp based on "T_coil inlet" data
+        test3_temp_gas_out_c= np.array([54.0,  54.0,  39.9]) 
 
         head_Rth_values = np.zeros(len(test3_blower_cfm))
         motor_Rth_load_values = np.zeros(len(test3_blower_cfm))
@@ -252,13 +156,13 @@ class SmartCompressor:
             # 6. Calculate Dynamic Thermal Resistances (Rth) based on external blower
             head_Rth_values[i] = (test3_temp_head_c[i] - test3_temp_room_c[i]) / max(0.1, head_friction_heat_w)
             
-            # NEW: Calculate the motor's actual resistance when the blower is blowing over it
+            # Calculate the motor's actual resistance when the blower is blowing over it
             motor_Rth_load_values[i] = (test3_temp_motor_c[i] - test3_temp_room_c[i]) / max(0.1, motor_heat_w)
             
         # Store the calculated curves using the external blower CFM
         self.head_Rth_curve = np.polyfit(test3_blower_cfm, head_Rth_values, 2)
         
-        # NEW: Override the free-spin motor curve with the real loaded blower curve
+        # Override the free-spin motor curve with the real loaded blower curve
         self.motor_Rth_curve = np.polyfit(test3_blower_cfm, motor_Rth_load_values, 2)
         
         self.epsilon_head = np.clip(np.mean(epsilon_values), 0.0, 1.0)
@@ -277,11 +181,15 @@ class SmartCompressor:
         return requested_pwm * throttle_multiplier
 
 
-    def update_system_state(self, voltage_v, p_up_pa, temp_up_k, p_down_pa, req_pump_pwm, req_blower_cfm, dt_s):
+    def update_system_state(self, voltage_v, temp_up_k, p_down_pa, req_pump_pwm, req_blower_cfm, dt_s):
         """
         Advances the simulation by 1 timestep (dt_s). 
-        Calculates fluid dynamics, tracks heat generation, and updates metal temperatures.
+        Calculates fluid dynamics, tracks heat generation, and updates metal temperatures
         """
+
+        Hepa_filter = hf.ZF111_HEPA_Filter()
+        Intake_hose = ih.IntakeHose_HiPoFlex()
+        Silencer = sl.AcousticSilencerChamber(chamber_vol_liters=0.564)
 
         self.voltage_v = voltage_v
         # Step 1: Input Validation & Safety Throttling
@@ -289,9 +197,7 @@ class SmartCompressor:
         req_blower_cfm = max(0.0, req_blower_cfm)
         actual_pwm = self._apply_thermal_safety_throttle(req_pump_pwm)
         
-        # delta_p_bar = max(0.0, p_down_pa - p_up_pa) / 100000.0
         delta_p_bar = (p_down_pa-1e5) / 100000.0
-
         
         # Step 2: Pneumatic & Electrical Flow
         if delta_p_bar > 8.0 or actual_pwm == 0.0:
@@ -304,7 +210,6 @@ class SmartCompressor:
             heat_motor_w = 0.0
         else:
             flow_nlpm = max(0.0, np.polyval(self.flow_curve, delta_p_bar)) * actual_pwm
-            # print(flow_nlpm, delta_p_bar, actual_pwm)
             mass_flow_kg_s = ((flow_nlpm / 1000.0) / 60.0) * self.rho_normal
             current_amps = max(0.0, np.polyval(self.current_curve, delta_p_bar)) * actual_pwm
 
@@ -312,6 +217,15 @@ class SmartCompressor:
 
             # A) Calculate pure electrical Motor Heat (I^2R)
             heat_motor_w = (current_amps ** 2) * self.R_coil_hot_ohms
+
+            
+
+            p_up_pa = Intake_hose.calculate_hose_state(
+                m_dot_kg_s=mass_flow_kg_s,
+                P_in_pa=101325.0,
+                T_in_k=temp_up_k,
+                T_amb_k=self.temp_ambient_k
+            )
 
             # B) Calculate Gas Temperature Dynamics
             pressure_ratio = p_down_pa / max(1.0, p_up_pa)
@@ -331,11 +245,12 @@ class SmartCompressor:
 
         # Step 4: Transient Temperature Update (Heating up the mass of the metals)
         
-        # Fetch the dynamic cooling resistance based on current fan/blower speeds
-
-        Rth_motor = max(0.05, np.polyval(self.motor_Rth_curve, req_blower_cfm))
-        # Rth_motor = max(0.05, np.polyval(self.motor_Rth_curve, actual_pwm))
-        Rth_head = max(0.05, np.polyval(self.head_Rth_curve, req_blower_cfm))
+        # Clamp the requested CFM to the bounds of our test data to prevent mathematical extrapolation errors
+        safe_cfm = np.clip(req_blower_cfm, 76.0, 107.2)
+        
+        # Fetch the dynamic cooling resistance based on clamped blower speeds
+        Rth_motor = max(0.05, np.polyval(self.motor_Rth_curve, safe_cfm))
+        Rth_head = max(0.05, np.polyval(self.head_Rth_curve, safe_cfm))
         
         # Calculate how much heat the fans are successfully blowing away into the room
         cooling_motor_w = (self.temp_motor_k - self.temp_ambient_k) / Rth_motor
@@ -347,49 +262,18 @@ class SmartCompressor:
             
         return flow_nlpm, current_amps, temp_out_gas_k, actual_pwm, self.temp_motor_k, self.temp_head_k, total_electrical_power_w
 
-
-# =====================================================================
-# SIMULATION EXECUTION (MAIN LOOP)
-# =====================================================================
 if __name__ == "__main__":
-    # Initialize the compressor (This automatically runs the calibration)
     comp = SmartCompressor()
     
+    silencer = sl.Silencer()
+    intake_hose = ih.IntakeHose()
+    
+
     print(f"--- Calibration Complete ---")
     print(f"Calculated Internal Heat-Exchanger Epsilon: {comp.epsilon_head:.3f}")
     print("-" * 75)
-    
-    # Define system pressures (1 Bar IN, 4 Bar OUT)
     pressure_intake_pa = 100000.0   
     pressure_discharge_pa = 400000.0  
     temp_room_k = 293.15    
-
     flow_nlpm = np.polyval(comp.flow_curve, 4)
-    print(flow_nlpm)
-    
-    # print("Running Thermodynamic Simulation: 100% Load, 3 Bar Differential")
-    # print(f"{'Time(s)':>7} | {'Flow(kg/s)':>12} | {'Motor Temp(C)':>15} | {'Head Temp(C)':>14} | {'Gas Out(C)':>12} | {'Electrical Power(W)':>18} | {'Flow(NLPM)':>12}")
-    # print("-" * 75)
-    
-    # time_step_s = 1.0
-    # PWM_demd = 1
-    # # Run the simulation for 300 seconds (5 minutes)
-    # for step in range(3001):
-        
-    #     # Advance the physics engine by 1 second
-    #     flow_kg_s, current, t_gas_k, act_pwm, t_mot_k, t_head_k, total_electrical_power_w, flow_nlpm = comp.update_system_state(
-    #         p_up_pa = pressure_intake_pa, 
-    #         temp_up_k = temp_room_k, 
-    #         p_down_pa = pressure_discharge_pa, 
-    #         req_pump_pwm = PWM_demd,        # Ask for 100% speed
-    #         req_blower_cfm = 25.0,     # External Sunon blower running at 25 CFM
-    #         dt_s = time_step_s
-    #     )
-        
-    #     # Print the data to the console every 30 seconds
-    #     if step % 30 == 0:
-    #         print(f"{step:7.1f} | {flow_kg_s:12.5f} | {t_mot_k-273.15:15.1f} | {t_head_k-273.15:14.1f} | {t_gas_k-273.15:12.1f} | {total_electrical_power_w:18.1f} | {flow_nlpm:12.1f}")
-            
-    #         # Warn the user if the software had to step in and save the motor from melting
-    #         if act_pwm < PWM_demd:
-    #             print(f"  -> WARNING: Thermal Limit Reached! Motor power reduced to {act_pwm*100:.1f}%")
+    print(f"Test Flow at 4 Bar: {flow_nlpm:.1f} NLPM")

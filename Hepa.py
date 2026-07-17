@@ -30,11 +30,14 @@ class ZF111_HEPA_Filter:
         # Reciprocating pump suction pulse threshold (Pa gauge)
         self.fracture_threshold_pa = 5000 
 
-    def pressure_drop(self, flow_lpm):
+    def pressure_drop(self, flow_lpm, loading=None):
         """
         Calculates the exact pressure drop (Pa) for a given flow rate (L/min) 
         based on the datasheet curve fit and current filter loading state.
         """
+        if loading is not None:
+            self.loading = loading
+
         if self.is_fractured:
             return 0.0  # Media ruptured; no flow resistance
             
@@ -46,14 +49,20 @@ class ZF111_HEPA_Filter:
         
         # Apply loading penalty. 
         # Assuming a fully clogged filter (1.0) increases resistance by a factor of 5.
-        dp_loaded = dp_clean * (1.0 + 4.0 * self.loading)
+        dp_loaded = dp_clean * (1.0 + 0 * self.loading)
+        print(f"Filter Loading: {self.loading:.4f} | Clean DP: {dp_clean:.2f} Pa | Loaded DP: {dp_loaded:.2f} Pa | Flow: {flow_lpm:.2f} L/min")
         
         return dp_loaded
 
-    def update_loading(self, flow_lpm, dt_s):
+    def update_loading(self, Previous_loading = None, flow_lpm = 0, dt_s = 0):
         """Advances the loading state based on flow volume over time."""
+        if Previous_loading is not None:
+            self.loading = Previous_loading
+
         volume_passed_liters = flow_lpm * (dt_s / 60.0)
-        self.loading = min(1.0, self.loading + (self.clog_rate * volume_passed_liters))
+        self.loading += min(1.0, self.loading + (self.clog_rate * volume_passed_liters))
+        return self.loading
+        # print(f"Filter Loading Updated: {self.loading:.4f} (0.0 = New, 1.0 = Clogged)")
 
     def check_pulse_fracture(self, peak_suction_pa):
         """Simulates catastrophic failure if reciprocating pump pulls too hard."""
@@ -66,7 +75,7 @@ if __name__ == "__main__":
     hepa = ZF111_HEPA_Filter()
     
     print(f"Testing {hepa.component_name} Model:")
-    test_flows = [15, 30, 60, 90, 100]
+    test_flows = [15, 77, 60, 90, 100]
     
     for q in test_flows:
         dp = hepa.pressure_drop(q)

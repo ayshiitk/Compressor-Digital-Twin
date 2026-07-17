@@ -44,8 +44,8 @@ class SmartCompressorTankTwin:
         
         self.total_energy_joules = 0.0
         
-        # Initialize State Machine
-        self.control_state = "MAX_RECOVERY"
+        # # Initialize State Machine
+        # self.control_state = "MAX_RECOVERY"
 
         # Initialize State Machine
         self.control_state = "MAX_RECOVERY"
@@ -58,7 +58,7 @@ class SmartCompressorTankTwin:
         self._prev_control_state = "MAX_RECOVERY"
 
     def get_pump_metrics(self, p_gauge_bar):
-        p_lookup = max(0.0, min(8.0, p_gauge_bar))
+        p_lookup = max(0.0, min(6.5, p_gauge_bar))
         flow_nlpm = max(0.0, float(np.polyval(self.pump_curve_flow, p_lookup)))
         current_amps = max(0.0, float(np.polyval(self.pump_curve_current, p_lookup)))
         return flow_nlpm, current_amps
@@ -265,7 +265,7 @@ class SmartCompressorTankTwin:
             q_vent_demand_nlpm = flow_insp
         else:
             q_vent_demand_nlpm = flow_exp
-        self.T_k = T_in_K  # Update the tank temperature for this simulation step
+        # self.T_k = T_in_K  # Update the tank temperature for this simulation step
 
 
 
