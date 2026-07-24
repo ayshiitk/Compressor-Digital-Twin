@@ -3,28 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Twin Telemetry</title>
+    <title>G&M Tech Digital Twin Studio</title>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-    
+
     <style>
-        /* =========================================
-           BRAND THEME & LAYOUT CSS
-           ========================================= */
-   :root {
-            --primary: #0066CC;       
-            --bg-surface: #F4F7FA;    
-            --bg-panel: #ffffff;      
-            --text-dark: #1E293B;     
-            --text-muted: #64748b;    
+        :root {
+            --primary: #00B4D8;       
+            --primary-dark: #0077B6;
+            --bg-surface: #0F172A;    
+            --bg-panel: #1E293B;      
+            --text-light: #F8FAFC;    
+            --text-muted: #94A3B8;    
             
             --ok-green: #10B981;      
             --alert-amber: #F59E0B;   
             --crit-red: #EF4444;      
             
-            --border-color: #e2e8f0;
+            --border-color: #334155;
             --font-label: 'Rajdhani', sans-serif;
             --font-num: 'Share Tech Mono', monospace;
         }
@@ -33,188 +29,172 @@
         
         body {
             background-color: var(--bg-surface);
-            color: var(--text-dark);
+            color: var(--text-light);
             font-family: var(--font-label);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-            overflow-y: auto;
-            background-image: 
-                linear-gradient(rgba(30, 41, 59, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(30, 41, 59, 0.03) 1px, transparent 1px);
-            background-size: 20px 20px;
+            display: flex; flex-direction: column;
+            overflow-x: hidden; overflow-y: auto;
         }
 
-        /* HEADER */
         header {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 20px;
-            background-color: var(--text-dark);
-            border-bottom: 3px solid var(--primary);
-            height: 60px; flex-shrink: 0;
-            color: #fff;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 10px 20px; background-color: #0B1120;
+            border-bottom: 3px solid var(--primary); height: 65px; flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
         
         .header-left, .header-center, .header-right { display: flex; align-items: center; gap: 15px; }
-        .header-title { font-size: 1.3rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
-        .clock { font-family: var(--font-num); font-size: 1.5rem; color: var(--ok-green); text-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+        .header-title { font-size: 1.4rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--primary); }
+        .clock { font-family: var(--font-num); font-size: 1.5rem; color: var(--ok-green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
         
         .status-indicator { display: flex; align-items: center; gap: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-        .dot { width: 12px; height: 12px; border-radius: 50%; background-color: var(--text-muted); box-shadow: 0 0 8px currentColor; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; background-color: var(--text-muted); }
         .status-indicator.live { color: var(--ok-green); }
-        .status-indicator.connecting { color: var(--alert-amber); }
+        .status-indicator.live .dot { background-color: var(--ok-green); box-shadow: 0 0 8px var(--ok-green); }
+        .status-indicator.staged { color: var(--alert-amber); }
+        .status-indicator.staged .dot { background-color: var(--alert-amber); box-shadow: 0 0 8px var(--alert-amber); }
         .status-indicator.disconnected { color: var(--crit-red); }
 
-        /* BUTTONS */
         .btn {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff;
-            font-family: var(--font-label); font-weight: 700; font-size: 1rem;
-            padding: 6px 16px; cursor: pointer; text-transform: uppercase;
-            border-radius: 4px; transition: all 0.2s;
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-light);
+            font-family: var(--font-label); font-weight: 700; font-size: 0.95rem;
+            padding: 6px 14px; cursor: pointer; text-transform: uppercase; border-radius: 4px; transition: all 0.2s;
         }
-        .btn:hover { background: rgba(255,255,255,0.2); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .input-error { border: 1px solid var(--crit-red, #ef4444) !important; box-shadow: 0 0 6px rgba(239,68,68,0.5) !important; }
+        .btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
         .btn-green { border-color: var(--ok-green); color: var(--ok-green); }
-        .btn-green:hover { background: var(--ok-green); color: #fff; }
+        .btn-green:hover:not(:disabled) { background: var(--ok-green); color: #fff; box-shadow: 0 0 10px rgba(16,185,129,0.4); }
         .btn-red { border-color: var(--crit-red); color: var(--crit-red); }
-        .btn-red:hover { background: var(--crit-red); color: #fff; }
-        .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
-        .btn-primary:hover { background: #005bb5; }
-        
-        .speed-control { display: flex; align-items: center; gap: 6px; color: #fff; font-weight: 700; text-transform: uppercase; }
-        .speed-control input { width: 64px; padding: 5px 6px; font-size: 1rem; }
-        .speed-control .btn { padding: 5px 10px; font-size: 0.85rem; }
+        .btn-red:hover:not(:disabled) { background: var(--crit-red); color: #fff; }
+        .btn-primary { background: var(--primary-dark); border-color: var(--primary); color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary); box-shadow: 0 0 10px rgba(0,180,216,0.4); }
 
-        /* GRID LAYOUT */
         .main-container {
-            display: grid;
-            grid-template-columns: 280px 1fr 300px;
+            display: grid; grid-template-columns: 320px 1fr 340px;
             gap: 15px; padding: 15px; flex-grow: 1;
+        }
+
+        .center-column { 
+            display: flex; flex-direction: column; gap: 20px; 
+            min-width: 0; min-height: 0; /* Prevents Chart.js from blowing out the grid */
         }
 
         .panel {
             background: var(--bg-panel); border: 1px solid var(--border-color);
-            border-radius: 6px; padding: 15px; display: flex; flex-direction: column;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;
+            border-radius: 8px; padding: 14px; display: flex; flex-direction: column;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2); position: relative; transition: all 0.3s ease;
         }
-        .panel-title { font-size: 0.95rem; font-weight: 700; text-transform: uppercase; color: var(--text-dark); margin-bottom: 12px; letter-spacing: 1px; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;}
+        .panel-title { 
+            font-size: 1rem; font-weight: 700; text-transform: uppercase; 
+            color: var(--primary); margin-bottom: 10px; letter-spacing: 1px; 
+            border-bottom: 2px solid var(--border-color); padding-bottom: 4px; 
+            display: flex; justify-content: space-between; align-items: center;
+        }
 
-        /* INPUTS & MODE */
+        /* FULLSCREEN MODAL OVERRIDE */
+        .panel.fullscreen-active {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 1000; border-radius: 0; margin: 0; padding: 20px;
+            background: var(--bg-surface);
+        }
+        .panel.fullscreen-active .chart-view { flex-grow: 1; height: auto; }
+        .panel.fullscreen-active .chart-view-dual { flex-grow: 1; height: auto; }
+
+        .stage-banner {
+            background: rgba(245, 158, 11, 0.15); border: 1px solid var(--alert-amber);
+            border-radius: 6px; padding: 10px; text-align: center; color: var(--alert-amber);
+            font-weight: bold; font-size: 0.85rem; margin-bottom: 12px; display: none;
+            animation: pulse 2s infinite;
+        }
+
         .mode-grid { display: grid; gap: 10px; }
-        .input-group { display: flex; flex-direction: column; gap: 2px; }
+        .input-group { display: flex; flex-direction: column; gap: 3px; }
         .input-group label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
         input[type="number"], select {
             background: var(--bg-surface); border: 1px solid var(--border-color);
-            color: var(--text-dark); font-family: var(--font-num); font-size: 1.1rem;
-            padding: 8px; outline: none; border-radius: 4px; font-weight: bold;
+            color: var(--text-light); font-family: var(--font-num); font-size: 1rem;
+            padding: 6px 8px; outline: none; border-radius: 4px; font-weight: bold;
         }
-        input[type="number"]:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0,102,204,0.2); }
+        input[type="number"]:focus, select:focus { border-color: var(--primary); }
         input[type="range"] { width: 100%; accent-color: var(--primary); }
-        .control-row { display: grid; grid-template-columns: 1fr 72px; gap: 8px; align-items: center; }
-        .control-row input[type="number"] { width: 72px; text-align: center; }
-        
-        .active-mode-display { margin-bottom: 15px; padding-bottom: 10px; }
-        .active-mode-name { font-family: var(--font-num); font-size: 1.4rem; font-weight: bold; color: var(--primary); }
 
-        /* GAUGES */
-        .center-column { display: flex; flex-direction: column; gap: 15px; }
-        .gauges-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        
-        .gauge-container {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px;
-            position: relative; padding: 10px; 
+        .control-row { display: grid; grid-template-columns: 1fr 65px; gap: 8px; align-items: center; }
+        .control-row input[type="number"] { width: 65px; text-align: center; }
+
+        .accordion-item {
+            background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);
+            border-radius: 6px; margin-bottom: 10px; overflow: hidden; transition: all 0.3s ease;
         }
-        .gauge-svg { width: 100%; height: auto; max-height: 180px; }
-        .gauge-val { font-family: var(--font-num); font-size: 2.2rem; font-weight: bold; color: var(--text-dark); position: absolute; bottom: 35px; text-align: center; width: 100%; }
-        .gauge-label { position: absolute; bottom: 12px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .accordion-header {
+            padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between;
+            align-items: center; font-weight: 700; font-size: 1rem; color: var(--text-light);
+            background: rgba(0, 180, 216, 0.05);
+        }
+        .accordion-header:hover { background: rgba(0, 180, 216, 0.12); }
+        .accordion-val { font-family: var(--font-num); font-size: 1.3rem; color: var(--primary); font-weight: bold; }
+        
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-in-out; background: var(--bg-surface); }
+        .accordion-item.open .accordion-content { max-height: 1000px; }
+        
+        .list-row {
+            display: flex; justify-content: space-between; padding: 7px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; color: var(--text-muted);
+        }
+        .list-val { font-family: var(--font-num); color: var(--text-light); font-weight: bold; }
 
-        /* THERMAL BARS */
-        .temp-row { display: flex; align-items: center; gap: 10px; }
-        .temp-label { width: 95px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-dark); }
-        .temp-track { flex-grow: 1; height: 16px; background: var(--bg-surface); border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
+        .sub-accordion-header { cursor: pointer; background: rgba(255,255,255,0.05); font-weight: 700; }
+        .sub-accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; padding-left: 12px; border-left: 2px solid var(--border-color); }
+        .sub-open .sub-accordion-content { max-height: 500px; }
+
+        .temp-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .temp-label { width: 100px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+        .temp-track { flex-grow: 1; height: 16px; background: var(--bg-surface); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color); }
         .temp-fill { height: 100%; transition: width 0.2s linear, background-color 0.3s; }
-        .temp-val { width: 60px; text-align: right; font-family: var(--font-num); font-weight: bold; font-size: 1.1rem; color: var(--text-dark); }
-        
-        /* BMS & SECONDARY PANELS */
-        .bms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;}
-        .bms-val { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; text-align: center; }
-        .bms-val span { font-family: var(--font-num); font-size: 1.4rem; font-weight: bold; color: var(--text-dark); }
-        .bms-val small { display: block; font-size: 0.7rem; font-weight: bold; color: var(--text-muted); }
-        .bms-status { text-align: center; font-weight: bold; padding: 6px; border-radius: 4px; font-size: 0.9rem; text-transform: uppercase;}
-        
-        .ac-btn-group { display: flex; gap: 5px; margin-top: 10px; }
-        .ac-btn-group .btn { flex: 1; border-color: var(--border-color); color: var(--text-dark); font-size: 0.85rem; }
-        .ac-btn-group .btn:hover { background: var(--border-color); }
+        .temp-val { width: 55px; text-align: right; font-family: var(--font-num); font-weight: bold; font-size: 1.1rem; color: var(--text-light); }
 
-        .expandable { cursor: pointer; transition: 0.2s; }
-        .expandable:hover { border-color: var(--primary); }
-        .big-val { font-family: var(--font-num); font-size: 2.2rem; font-weight: bold; color: var(--primary); text-align: center; }
-        .breakdown { display: none; margin-top: 10px; font-family: var(--font-num); font-size: 0.8rem; }
-        .expandable.open .breakdown { display: block; }
-        
-        /* BARS */
-        .bar-row { display: flex; align-items: center; margin-bottom: 6px; gap: 8px; }
-        .bar-label { width: 80px; text-align: right; color: var(--text-dark); font-weight: 700; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
-        .bar-track { flex-grow: 1; height: 10px; background: var(--bg-surface); border-radius: 5px; overflow: hidden; border: 1px solid var(--border-color); }
-        .bar-fill { height: 100%; background: var(--primary); transition: width 0.1s linear; }
-        .bar-val { width: 40px; text-align: left; font-weight: bold; }
+        .power-meter-container {
+            background: var(--bg-surface); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .power-header { display: flex; justify-content: space-between; align-items: baseline; }
+        .power-title { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .power-readout { font-family: var(--font-num); font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .power-track { height: 20px; background: #0B1120; border-radius: 4px; border: 1px solid var(--border-color); overflow: hidden; position: relative; }
+        .power-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--ok-green) 0%, var(--alert-amber) 70%, var(--crit-red) 100%); transition: width 0.15s ease-out; }
 
-        /* DATA EXPLORER MODAL */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(15, 23, 42, 0.95); /* Deep dark background */
-            z-index: 1000; display: none; flex-direction: column;
-            backdrop-filter: blur(5px);
+        .tacho-container {
+            background: var(--bg-surface); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 12px; text-align: center;
         }
-        .modal-overlay.open { display: flex; }
-        
-        .modal-header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 15px 30px; background: var(--text-dark); border-bottom: 3px solid var(--primary);
-            color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-        .modal-title { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; display: flex; align-items: center; gap: 10px;}
-        .modal-title-pulse { width: 10px; height: 10px; background: var(--alert-amber); border-radius: 50%; animation: pulse 2s infinite; }
-        
-        .modal-actions { display: flex; gap: 15px; }
-        
-        .modal-content {
-            flex: 1; padding: 25px; overflow-y: auto;
-            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
-            align-content: start;
-        }
-        .chart-card {
-            background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px; padding: 15px; height: 320px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            position: relative;
-        }
-        .chart-wrapper { width: 100%; height: 100%; }
+        .tacho-val { font-family: var(--font-num); font-size: 2.2rem; font-weight: bold; color: var(--text-light); letter-spacing: 2px; }
+        .tacho-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
-        }
+        /* BMS & AC/DC CONTROLS */
+        .bms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;}
+        .bms-val { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; text-align: center; }
+        .bms-val span { font-family: var(--font-num); font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+        .bms-val small { display: block; font-size: 0.7rem; font-weight: bold; color: var(--text-muted); margin-top: 2px; }
+        
+        .power-switch-container { display: flex; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
+        .power-btn { flex: 1; padding: 8px; text-align: center; font-weight: bold; cursor: pointer; transition: 0.3s; color: var(--text-muted); font-size: 0.85rem; }
+        .power-btn.active-ac { background: var(--primary-dark); color: #fff; }
+        .power-btn.active-dc { background: var(--ok-green); color: #fff; }
 
-        /* UTILITY STATUS COLORS */
-        .c-ok { color: var(--ok-green) !important; }
-        .bg-ok { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--ok-green); color: var(--ok-green); }
-        .c-alert { color: var(--alert-amber) !important; }
-        .bg-alert { background: rgba(245, 158, 11, 0.1); border: 1px solid var(--alert-amber); color: var(--alert-amber); }
-        .c-crit { color: var(--crit-red) !important; }
-        .bg-crit { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--crit-red); color: var(--crit-red); }
-        .bg-ac { background: rgba(0, 102, 204, 0.1); border: 1px solid var(--primary); color: var(--primary); }
+        .chart-tabs { display: flex; gap: 5px; border-bottom: 2px solid var(--border-color); margin-bottom: 10px; }
+        .tab-btn { background: transparent; border: none; color: var(--text-muted); font-family: var(--font-label); font-weight: 700; font-size: 0.9rem; padding: 6px 12px; cursor: pointer; text-transform: uppercase; }
+        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+        .chart-view { display: none; height: 260px; width: 100%; position: relative; }
+        .chart-view.active { display: block; }
+        .chart-view-dual { display: none; flex-direction: column; gap: 10px; height: 320px; }
+        .chart-view-dual.active { display: flex; }
     </style>
 </head>
 <body>
 
-    <!-- MAIN HEADER -->
     <header>
         <div class="header-left">
-            <div class="header-title">DIGITAL TWIN</div>
+            <div class="header-title">G&M Digital Twin Studio</div>
             <div class="clock" id="sim-clock">00:00.000</div>
         </div>
         <div class="header-center">
@@ -224,714 +204,746 @@
             </div>
         </div>
         <div class="header-right">
-            <button class="btn btn-green" onclick="sendSimControl('start')">Run Sim</button>
-            <button class="btn btn-red" onclick="sendSimControl('stop')">Halt</button>
-            <div class="speed-control">
-                <span>Speed</span>
-                <input type="number" id="input-sim-speed" min="0.1" step="0.1" value="1" onchange="sendSimSpeed()" onkeydown="if(event.key === 'Enter') sendSimSpeed()">
-                <button class="btn" onclick="sendSimSpeed()">Apply</button>
-            </div>
-            <!-- REPLACED TOGGLE WITH DATA EXPLORER BUTTON -->
-            <button class="btn btn-primary" onclick="openAnalytics()">📊 Data Explorer</button>
+            <button class="btn btn-green" id="btn-run-sim" onclick="runSimulation()" disabled>Run Sim</button>
+            <button class="btn btn-red" onclick="haltSimulation()">Halt</button>
         </div>
     </header>
 
     <div class="main-container">
         
-        <!-- LEFT: MODE CONTROL -->
-        <div class="panel">
-            <div class="panel-title">Ventilation Mode</div>
-            <div class="active-mode-display">
-                <div class="active-mode-name" id="disp-mode-name">---</div>
-                <div style="display: flex; gap:10px; font-family: var(--font-num); color: var(--text-dark); font-size: 1rem; margin-top: 5px; font-weight: bold;">
-                    <div>Insp: <span id="disp-mode-flow" class="c-ok">0</span> LPM</div>
-                    <div>I:E <span id="disp-mode-ie" class="c-ok">0:0</span></div>
+        <!-- LEFT: PARAMETER STAGING & CONTROL -->
+        <div class="panel" style="overflow-y: auto; max-height: calc(100vh - 95px);">
+            
+            <div class="stage-banner" id="stage-banner">
+                ⚠️ PARAMETERS MODIFIED<br>
+                <span style="font-weight: normal; font-size: 0.75rem">Click 'Apply & Stage' to lock changes & enable simulation.</span>
+            </div>
+
+            <button class="btn btn-primary" id="btn-stage-params" style="margin-bottom: 15px; width: 100%; padding: 10px;" onclick="stageParameters()">
+                ✓ Apply Parameters & Stage Sim
+            </button>
+
+            <div class="panel-title">Hardware Architecture</div>
+            <div class="mode-grid" style="margin-bottom: 15px;">
+                <div class="input-group">
+                    <label>Compressor Model</label>
+                    <select id="input-compressor-model" onchange="markModified()">
+                        <option value="140RND">G&M Tech 140RND-ED</option>
+                        <option value="120RND">G&M Tech 120RND-ED</option>
+                    </select>
                 </div>
             </div>
 
-            <div class="panel-title" style="margin-top: 10px;">Command Stage</div>
-            <div class="mode-grid">
+            <div class="panel-title">Environment & Setup</div>
+            <div class="mode-grid" style="margin-bottom: 15px;">
                 <div class="input-group">
-                    <label>Preset Target</label>
-                    <select id="input-preset" onchange="loadPreset()">
-                        <option value="Custom">Custom</option>
-                        <option value="VCV - Adult">VCV - Adult</option>
-                        <option value="VCV - Pediatric">VCV - Pediatric</option>
-                        <option value="PCV - Adult">PCV - Adult</option>
-                    </select>
+                    <label>Sim Duration (Sec)</label>
+                    <input type="number" id="input-sim-time" value="1000" oninput="markModified()">
                 </div>
                 <div class="input-group">
-                    <label>Insp Flow Target (LPM)</label>
-                    <input type="number" id="input-flow" value="48.0" step="0.1" oninput="markCustom()">
+                    <label>Chart Window (Sec)</label>
+                    <input type="number" id="input-chart-window" value="60" min="5" step="5">
                 </div>
                 <div class="input-group">
-                    <label>Exp Flow / Bias (LPM)</label>
-                    <input type="number" id="input-exp-flow" value="0.0" step="0.1" oninput="markCustom()">
+                    <label>Ambient Temp (°C)</label>
+                    <input type="number" id="input-amb-temp" value="25.0" step="0.5" oninput="markModified()">
                 </div>
                 <div class="input-group">
-                    <label>Ti (s)</label>
-                    <input type="number" id="input-ti" value="0.5" step="0.1" oninput="markCustom()">
+                    <label>Compressor life (Hrs)</label>
+                    <input type="number" id="input-hepa-hrs" value="0" step="10" oninput="markModified()">
                 </div>
-                <div class="input-group">
-                    <label>Te (s)</label>
-                    <input type="number" id="input-te" value="0.5" step="0.1" oninput="markCustom()">
-                </div>
-                <button class="btn btn-green" style="margin-top: 10px;" onclick="sendNewMode()">Apply to Tank</button>
             </div>
 
-            <div class="panel-title" style="margin-top: 16px;">Pump Control</div>
-            <div class="mode-grid">
+            <div class="panel-title">Tank & Pump Limits</div>
+            <div class="mode-grid" style="margin-bottom: 15px;">
                 <div class="input-group">
-                    <label>Demand Mode</label>
-                    <select id="input-pump-mode" onchange="sendPumpControl()">
-                        <option value="AUTO">AUTO</option>
-                        <option value="MANUAL">MANUAL</option>
-                    </select>
+                    <label>Min Pump RPM Cap</label>
+                    <input type="number" id="input-min-rpm" value="1000" min="0" step="10" oninput="markModified()">
                 </div>
                 <div class="input-group">
-                    <label>Manual Command</label>
-                    <select id="input-pump-command-mode" onchange="updatePumpCommandUI(); sendPumpControl()">
-                        <option value="PWM">Speed %</option>
-                        <option value="RPM">Target RPM</option>
-                    </select>
+                    <label>Tank Min Press (Bar)</label>
+                    <input type="number" id="input-min-press" value="1.5" step="0.1" oninput="markModified()">
                 </div>
                 <div class="input-group">
-                    <label>Speed Command (%)</label>
-                    <div class="control-row">
-                        <input type="range" id="input-pump-pwm" min="0" max="100" step="1" value="100" oninput="syncControlValue('pump'); sendPumpControl()">
-                        <input type="number" id="input-pump-pwm-num" min="0" max="100" step="1" value="100" oninput="syncControlValue('pump', true); sendPumpControl()">
+                    <label>Tank Max Press (Bar)</label>
+                    <input type="number" id="input-max-press" value="2.5" step="0.1" oninput="markModified()">
+                </div>
+            </div>
+
+            <div class="panel-title">Ventilation Demand</div>
+            <div class="mode-grid" style="margin-bottom: 15px;">
+                <div class="input-group">
+                    <label>Insp Target Flow (NLPM)</label>
+                    <input type="number" id="input-flow" value="48.0" step="0.1" oninput="markModified()">
+                </div>
+                <div class="input-group">
+                    <label>Exp Bias Flow (NLPM)</label>
+                    <input type="number" id="input-exp-flow" value="0.0" step="0.1" oninput="markModified()">
+                </div>
+                <div class="input-group" style="flex-direction: row; gap: 8px;">
+                    <div style="flex: 1;">
+                        <label>Ti (s)</label>
+                        <input style="width: 100%" type="number" id="input-ti" value="0.5" step="0.1" oninput="markModified()">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Te (s)</label>
+                        <input style="width: 100%" type="number" id="input-te" value="0.5" step="0.1" oninput="markModified()">
                     </div>
                 </div>
-                <div class="input-group" id="pump-rpm-control" style="display: none;">
-                    <label>Target RPM</label>
-                    <input type="number" id="input-pump-rpm" min="0" max="3000" step="10" value="2500" oninput="sendPumpControl()">
-                </div>
             </div>
 
-            <div class="panel-title" style="margin-top: 16px;">Blower Control</div>
-            <div class="mode-grid">
+            <div class="panel-title">Motor & Blower Actuation</div>
+            <div class="mode-grid" style="margin-bottom: 15px;">
                 <div class="input-group">
-                    <label>Cooling Mode</label>
-                    <select id="input-blower-mode" onchange="sendBlowerControl()">
-                        <option value="AUTO">AUTO</option>
-                        <option value="MANUAL">MANUAL</option>
+                    <label>Pump Control Mode</label>
+                    <select id="input-pump-mode" onchange="updatePumpUI(); markModified();">
+                        <option value="AUTO">Automatic Demand</option>
+                        <option value="MANUAL_PWM">Manual - PWM %</option>
+                        <option value="MANUAL_RPM">Manual - Target RPM</option>
                     </select>
                 </div>
-                <div class="input-group">
-                    <label>Blower PWM (%)</label>
+                <div class="input-group" id="pump-pwm-ui" style="display: none;">
+                    <label>Pump Duty Cycle (%)</label>
                     <div class="control-row">
-                        <input type="range" id="input-blower-pwm" min="0" max="100" step="1" value="0" oninput="syncControlValue('blower'); sendBlowerControl()">
-                        <input type="number" id="input-blower-pwm-num" min="0" max="100" step="1" value="0" oninput="syncControlValue('blower', true); sendBlowerControl()">
+                        <input type="range" id="input-pump-pwm" min="0" max="100" value="100" oninput="syncVal('pump'); markModified();">
+                        <input type="number" id="input-pump-pwm-num" min="0" max="100" value="100" oninput="syncVal('pump', true); markModified();">
                     </div>
                 </div>
+                <div class="input-group" id="pump-rpm-ui" style="display: none;">
+                    <label>Target Speed (RPM)</label>
+                    <input type="number" id="input-pump-rpm" min="0" max="3000" step="10" value="2300" oninput="markModified()">
+                </div>
+                
+                <div class="input-group">
+                    <label>Blower Control Mode</label>
+                    <select id="input-blower-mode" onchange="updateBlowerUI(); markModified();">
+                        <option value="AUTO">Auto (Thermal PID)</option>
+                        <option value="MANUAL_RPM">Manual - Target RPM</option>
+                    </select>
+                </div>
+                <div class="input-group" id="blower-rpm-ui" style="display: none;">
+                    <label>Blower Target (RPM)</label>
+                    <input type="number" id="input-blower-rpm" min="0" max="6820" step="50" value="6820" oninput="markModified()">
+                </div>
+            </div>
+            
+            <div class="panel-title">Orifice Diameters (mm)</div>
+            <div class="mode-grid">
+                <div class="input-group"><label>Air Filter Bleed</label><input type="number" id="ori-af" value="0.6" step="0.05" min="0.05" oninput="markModified()"></div>
+                <div class="input-group"><label>Water Sep Bleed</label><input type="number" id="ori-ws" value="0.6" step="0.05" min="0.05" oninput="markModified()"></div>
+                <div class="input-group"><label>Mist Sep Bleed</label><input type="number" id="ori-ms" value="0.6" step="0.05" min="0.05" oninput="markModified()"></div>
+                <div class="input-group"><label>Tank Auto-Drain</label><input type="number" id="ori-tank" value="0.6" step="0.05" min="0.05" oninput="markModified()"></div>
             </div>
         </div>
 
-        <!-- CENTER: DYNAMICS & THERMALS -->
+        <!-- CENTER: INTERACTIVE DATA & LIVE TELEMETRY CURVES -->
         <div class="center-column">
             
+            <!-- ACCORDIONS -->
             <div class="panel">
-                <div class="panel-title">Kinematics & Flow</div>
-                <div class="gauges-grid-2" id="gauges-group-1"></div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-title">System Load</div>
-                <div class="gauges-grid-2" id="gauges-group-2"></div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-title" style="display: flex; justify-content: space-between;">
-                    Thermal Status
-                    <span style="color: var(--text-muted); font-size: 0.85rem; text-transform: none;">
-                        Ambient: <span id="val-ambient" style="color: var(--text-dark); font-family: var(--font-num); font-size: 1.1rem;">25.0</span> °C
-                    </span>
+                <div class="panel-title">System Status Breakdown</div>
+                
+                <div class="accordion-item" id="acc-flow">
+                    <div class="accordion-header" onclick="toggleAccordion('acc-flow')">
+                        <span>Flow to Ventilator</span>
+                        <span class="accordion-val"><span id="val-flow-vent">0.0</span> <span style="font-size:0.8rem">NLPM</span></span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="list-row"><span>Compressor Supply</span> <span class="list-val" id="val-flow-comp">0.0</span></div>
+                        <div class="list-row"><span>Target Vent Demand</span> <span class="list-val" id="val-flow-demand">0.0</span></div>
+                        <div class="list-row"><span>Supply to Tank</span> <span class="list-val" id="val-flow-tank">0.0</span></div>
+                        
+                        <div class="list-row sub-accordion-header" onclick="toggleSubAccordion('sub-drain', event)">
+                            <span>Total Drain Flow ▼</span> <span class="list-val" id="val-drain-total" style="color: var(--crit-red);">0.0</span>
+                        </div>
+                        <div class="sub-accordion-content" id="sub-drain">
+                            <div class="list-row"><span>Tank Drain</span> <span class="list-val" id="val-drain-tank">0.0</span></div>
+                            <div class="list-row"><span>Air Filter Drain</span> <span class="list-val" id="val-drain-af">0.0</span></div>
+                            <div class="list-row"><span>Water Separator Drain</span> <span class="list-val" id="val-drain-ws">0.0</span></div>
+                            <div class="list-row"><span>Mist Separator Drain</span> <span class="list-val" id="val-drain-ms">0.0</span></div>
+                        </div>
+                    </div>
                 </div>
-                <div id="thermal-bars-container" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;"></div>
+
+                <div class="accordion-item" id="acc-pressure">
+                    <div class="accordion-header" onclick="toggleAccordion('acc-pressure')">
+                        <span>Tank Pressure</span>
+                        <span class="accordion-val"><span id="val-press-tank">0.00</span> <span style="font-size:0.8rem">Bar(g)</span></span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="list-row" style="background: rgba(0,0,0,0.2); color: var(--primary); font-weight: bold;">
+                            <span>Cascading Pressure Stage</span> <span>Pressure (Bar)</span>
+                        </div>
+                        <div class="list-row"><span>After HEPA</span> <span class="list-val" id="val-p-hepa">0.00</span></div>
+                        <div class="list-row"><span>After Silencer</span> <span class="list-val" id="val-p-silencer">0.00</span></div>
+                        <div class="list-row"><span>After Intake Hose</span> <span class="list-val" id="val-p-intake">0.00</span></div>
+                        <div class="list-row"><span>After Compressor</span> <span class="list-val" id="val-p-comp">0.00</span></div>
+                        <div class="list-row"><span>After Discharge Hose</span> <span class="list-val" id="val-p-disch">0.00</span></div>
+                        <div class="list-row"><span>After Cooling Coil</span> <span class="list-val" id="val-p-coil">0.00</span></div>
+                        <div class="list-row"><span>After NRV</span> <span class="list-val" id="val-p-nrv">0.00</span></div>
+                        <div class="list-row"><span>After Air Filter</span> <span class="list-val" id="val-p-af">0.00</span></div>
+                        <div class="list-row"><span>After Water Separator</span> <span class="list-val" id="val-p-ws">0.00</span></div>
+                        <div class="list-row"><span>After Mist Separator</span> <span class="list-val" id="val-p-ms">0.00</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LIVE TREND ANALYSIS CURVES STUDIO -->
+            <div class="panel" id="chart-panel" style="flex-grow: 1;">
+                <div class="panel-title">
+                    Telemetry Curves Studio
+                    <button class="btn" id="btn-fullscreen" style="padding: 2px 8px; font-size: 0.8rem;" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+                </div>
+                
+                <div class="chart-tabs">
+                    <button class="tab-btn active" onclick="switchTab('tab-press')">Cascading Pressure</button>
+                    <button class="tab-btn" onclick="switchTab('tab-flow')">Flow Dynamics</button>
+                    <button class="tab-btn" onclick="switchTab('tab-temp')">Thermal Profile</button>
+                    <button class="tab-btn" onclick="switchTab('tab-power')">Power Draw</button>
+                </div>
+
+                <div class="chart-view active" id="tab-press"><canvas id="chart-pressure"></canvas></div>
+                
+                <div class="chart-view-dual" id="tab-flow">
+                    <div style="flex: 1; position: relative;"><canvas id="chart-flow-main"></canvas></div>
+                    <div style="flex: 1; position: relative;"><canvas id="chart-flow-drain"></canvas></div>
+                </div>
+
+                <div class="chart-view" id="tab-temp"><canvas id="chart-thermal"></canvas></div>
+                <div class="chart-view" id="tab-power"><canvas id="chart-power"></canvas></div>
             </div>
         </div>
 
-        <!-- RIGHT: BATTERY & PANELS -->
+        <!-- RIGHT: HARDWARE METRICS & DYNAMICS -->
         <div class="panel" style="background: transparent; border: none; padding: 0; box-shadow: none; gap: 15px;">
             
-            <div class="panel" style="padding: 10px;">
-                <div class="panel-title">BMS Telemetry</div>
+            <!-- POWER METER BAR -->
+            <div class="panel">
+                <div class="panel-title">Electrical Power Draw</div>
+                <div class="power-meter-container">
+                    <div class="power-header">
+                        <span class="power-title">Active Consumption</span>
+                        <div class="power-readout"><span id="val-power-w">0.0</span> <span style="font-size: 1rem">W</span></div>
+                    </div>
+                    <div class="power-track">
+                        <div class="power-fill" id="power-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIGITAL TACHOMETER -->
+            <div class="panel">
+                <div class="panel-title">Pump Speed</div>
+                <div class="tacho-container">
+                    <div class="tacho-val" id="val-rpm-digital">0000</div>
+                    <div class="tacho-label">REVOLUTIONS PER MINUTE</div>
+                </div>
+            </div>
+
+            <!-- THERMALS -->
+            <div class="panel">
+                <div class="panel-title">Thermal Systems</div>
+                <div id="thermal-bars-container" style="display: flex; flex-direction: column; margin-top: 5px;"></div>
+            </div>
+
+            <!-- BMS & POWER SOURCE -->
+            <div class="panel">
+                <div class="panel-title">Power Source & BMS</div>
+                <div class="power-switch-container">
+                    <div class="power-btn active-ac" id="btn-ac" onclick="setPower('AC')">AC Mains</div>
+                    <div class="power-btn" id="btn-dc" onclick="setPower('DC')">Battery</div>
+                </div>
                 <div class="bms-grid">
-                    <div class="bms-val"><span id="bms-volts">--</span><small>VOLTAGE (V)</small></div>
-                    <div class="bms-val"><span id="bms-soc">--</span><small>CHARGE (%)</small></div>
-                    <div class="bms-val"><span id="bms-temp">--</span><small>TEMP (°C)</small></div>
-                    <div class="bms-val"><span id="bms-time">--</span><small>TIME REM (MIN)</small></div>
+                    <div class="bms-val"><span id="bms-volts">0.0</span><small>VOLTS (V)</small></div>
+                    <div class="bms-val"><span id="bms-soc">0</span><small>CHARGE (%)</small></div>
+                    <!-- RE-ADDED DYNAMIC TIME REMAINING BLOCK -->
+                    <div class="bms-val" style="grid-column: span 2;"><span id="bms-time">--</span><small id="bms-time-label">MINS TO FULL CHARGE</small></div>
                 </div>
-                <div class="bms-status bg-ac" id="bms-status-text">WAITING FOR DATA</div>
-                <div class="ac-btn-group">
-                    <button class="btn" style="background: var(--text-dark); color: #fff;" onclick="sendSimControl('ac_connect')">🔌 PLUG AC</button>
-                    <button class="btn" style="background: var(--text-muted); color: #fff;" onclick="sendSimControl('ac_disconnect')">🔋 UNPLUG</button>
-                </div>
-            </div>
-
-            <div class="panel expandable" onclick="this.classList.toggle('open')">
-                <div class="panel-title">System Drain (LPM) <span style="float:right; font-size:0.7rem; color: var(--primary);">▼</span></div>
-                <div class="big-val" id="val-drain-total">0.00</div>
-                <div class="breakdown" id="drain-breakdown"></div>
-            </div>
-
-            <div class="panel expandable" onclick="this.classList.toggle('open')">
-                <div class="panel-title">Total APU Drop (kPa) <span style="float:right; font-size:0.7rem; color: var(--primary);">▼</span></div>
-                <div class="big-val" id="val-pd-total">0.0</div>
-                <div class="breakdown" id="pd-breakdown"></div>
             </div>
         </div>
 
     </div>
 
-    <!-- NEW DATA EXPLORER MODAL -->
-    <div id="analytics-modal" class="modal-overlay">
-        <div class="modal-header">
-            <div class="modal-title">
-                <div class="modal-title-pulse"></div>
-                Trend Analysis (Paused for Review)
-            </div>
-            <div class="modal-actions">
-                <button class="btn" onclick="exportCSV()">📥 Export CSV</button>
-                <button class="btn btn-red" onclick="closeAnalytics()">✕ Close & Resume</button>
-            </div>
-        </div>
-        <div class="modal-content">
-            <!-- Charts are grouped into 2 columns automatically by grid -->
-            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-flow"></canvas></div></div>
-            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-pressure"></canvas></div></div>
-            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-motor"></canvas></div></div>
-            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-thermal"></canvas></div></div>
-            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-electrical"></canvas></div></div>
-            <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-control"></canvas></div></div>
-        </div>
-    </div>
-
-    <!-- =========================================
-         JAVASCRIPT LOGIC
-         ========================================= -->
     <script>
-        const CONFIG = {
-            WS_URL: 'ws://localhost:8765',
-            RECONNECT_MS: 2000,
-            LIVE_WINDOW_SECONDS: 30, 
-            
-            GAUGES: {
-                flow:  { id: 'flow', label: 'Flow Delivered', unit: 'LPM', range: [0, 120], redline: 112, ticks: 20, target: 'gauges-group-1' },
-                rpm:   { id: 'rpm', label: 'Motor Speed', unit: 'RPM', range: [0, 3000], redline: 2800, ticks: 500, target: 'gauges-group-1' },
-                tank:  { id: 'tank', label: 'Tank Pressure', unit: 'bar', range: [0, 7], redline: 6.25, ticks: 1, target: 'gauges-group-2' },
-                power: { id: 'power', label: 'Power Draw', unit: 'W', range: [0, 800], redline: 750, ticks: 100, target: 'gauges-group-2' }
-            },
-
-            PRESETS: {
-                "VCV - Adult":     { flow: 40.0, exp_flow: 0.0, ti: 1.0, te: 2.0 },
-                "VCV - Pediatric": { flow: 15.0, exp_flow: 0.0, ti: 0.8, te: 1.5 },
-                "PCV - Adult":     { flow: 50.0, exp_flow: 2.0, ti: 1.2, te: 2.4 }
-            }
-        };
-
+        const CONFIG = { WS_URL: 'ws://localhost:8765', RECONNECT_MS: 2000 };
         let ws = null;
-        let viewMode = 'LIVE'; // LIVE scrolls automatically, REVIEW pauses scrolling for analysis
-        let lastTimestamp = 0;
-        let updatePending = false;
+        let isStaged = false;
+
+        /* --- STAGING & SIM CONTROL LOGIC --- */
+        function markModified() {
+            isStaged = false;
+            document.getElementById('stage-banner').style.display = 'block';
+            document.getElementById('btn-run-sim').disabled = true;
+            DOM.statusIndicator.className = 'status-indicator staged';
+            DOM.statusText.innerText = 'NEEDS STAGING';
+            sendWS({ type: "sim_control", action: "stop" });
+        }
+
+        // Fields that MUST be a real number to stage safely, with a friendly label
+        // for the popup and a minimum allowed value (orifices can never be 0 --
+        // that caused a divide-by-zero crash deep in the Python physics solver).
+        const REQUIRED_NUMERIC_FIELDS = [
+            { id: 'input-sim-time', label: 'Sim Time',          min: 0.01 },
+            { id: 'input-amb-temp', label: 'Ambient Temp',      min: -50 },
+            { id: 'input-hepa-hrs', label: 'HEPA Hours',        min: 0 },
+            { id: 'input-min-rpm', label: 'Min Pump RPM Cap',   min: 0 },
+            { id: 'input-min-press', label: 'Tank Min Pressure', min: 0.1 },
+            { id: 'input-max-press', label: 'Tank Max Pressure', min: 0.1 },
+            { id: 'input-flow',     label: 'Inspiration Flow',  min: 0 },
+            { id: 'input-exp-flow', label: 'Expiration Flow',   min: 0 },
+            { id: 'input-ti',       label: 'Ti (s)',            min: 0.01 },
+            { id: 'input-te',       label: 'Te (s)',            min: 0.01 },
+            { id: 'input-pump-pwm', label: 'Pump PWM',          min: 0 },
+            { id: 'input-pump-rpm', label: 'Pump RPM',          min: 0 },
+            { id: 'input-blower-rpm', label: 'Blower Target RPM',min: 0 },
+            { id: 'ori-af',   label: 'Air Filter Bleed Orifice',   min: 0.05 },
+            { id: 'ori-ws',   label: 'Water Sep Bleed Orifice',    min: 0.05 },
+            { id: 'ori-ms',   label: 'Mist Sep Bleed Orifice',     min: 0.05 },
+            { id: 'ori-tank', label: 'Tank Auto-Drain Orifice',    min: 0.05 },
+        ];
+
+        // Returns null if everything is valid, otherwise the failing field's label.
+        function validateNumericInputs() {
+            for (const f of REQUIRED_NUMERIC_FIELDS) {
+                const el = document.getElementById(f.id);
+                if (!el) continue;
+                const val = parseFloat(el.value);
+                if (el.value.trim() === '' || isNaN(val) || !isFinite(val) || val < f.min) {
+                    el.classList.add('input-error');
+                    el.focus();
+                    return f.label + (f.min === 0.05 ? ' (must be a number ≥ 0.05mm — 0 is not allowed)' : '');
+                }
+                el.classList.remove('input-error');
+            }
+            return null;
+        }
+
+        function stageParameters() {
+            const badField = validateNumericInputs();
+            if (badField) {
+                alert('⚠ Cannot stage simulation.\n\n"' + badField + '" is empty or invalid.\nPlease enter a valid number and try again.');
+                isStaged = false;
+                document.getElementById('btn-run-sim').disabled = true;
+                return;
+            }
+
+            isStaged = true;
+            document.getElementById('stage-banner').style.display = 'none';
+            document.getElementById('btn-run-sim').disabled = false;
+            DOM.statusIndicator.className = 'status-indicator live';
+            DOM.statusText.innerText = 'STAGED & READY';
+
+            sendWS({
+                type: "stage_parameters",
+                compressor_model: document.getElementById('input-compressor-model').value,
+                sim_time_s: parseFloat(document.getElementById('input-sim-time').value),
+                ambient_c: parseFloat(document.getElementById('input-amb-temp').value),
+                hepa_hrs: parseFloat(document.getElementById('input-hepa-hrs').value),
+                flow_insp: parseFloat(document.getElementById('input-flow').value),
+                flow_exp: parseFloat(document.getElementById('input-exp-flow').value),
+                ti_s: parseFloat(document.getElementById('input-ti').value),
+                te_s: parseFloat(document.getElementById('input-te').value),
+                pump_mode: document.getElementById('input-pump-mode').value,
+                pump_pwm: parseFloat(document.getElementById('input-pump-pwm').value),
+                pump_rpm: parseFloat(document.getElementById('input-pump-rpm').value),
+                min_rpm_cap: parseFloat(document.getElementById('input-min-rpm').value),
+                min_press: parseFloat(document.getElementById('input-min-press').value),
+                max_press: parseFloat(document.getElementById('input-max-press').value),
+                blower_mode: document.getElementById('input-blower-mode').value,
+                blower_rpm: parseFloat(document.getElementById('input-blower-rpm').value),
+                orifices: {
+                    af_mm: parseFloat(document.getElementById('ori-af').value),
+                    ws_mm: parseFloat(document.getElementById('ori-ws').value),
+                    ms_mm: parseFloat(document.getElementById('ori-ms').value),
+                    tank_mm: parseFloat(document.getElementById('ori-tank').value)
+                }
+            });
+        }
+
+        function runSimulation() {
+            if (!isStaged) return;
+            resetCharts();
+            sendWS({ type: "sim_control", action: "start" });
+        }
+
+        function haltSimulation() {
+            sendWS({ type: "sim_control", action: "stop" });
+        }
+
+        /* --- UI HELPERS --- */
+        function toggleAccordion(id) { document.getElementById(id).classList.toggle('open'); }
+        function toggleSubAccordion(id, e) { e.stopPropagation(); document.getElementById(id).parentElement.classList.toggle('sub-open'); }
         
-        const history = {
-            t: [], flow_target: [], flow_del: [], tank_p: [],
-            rpm: [], power: [], soc: [], pwm: [], total_drain: [], total_pd: [],
-            motor_temp: [], head_temp: [], battery_voltage: [], battery_derating: [], battery_fan_pwm: [], pump_command_pwm: []
-        };
+        function setPower(mode) {
+            document.getElementById('btn-ac').classList.toggle('active-ac', mode === 'AC');
+            document.getElementById('btn-dc').classList.toggle('active-dc', mode === 'DC');
+            
+            // Immediately update the BMS time label when power mode changes
+            document.getElementById('bms-time-label').innerText = mode === 'AC' ? 'MINS TO FULL CHARGE' : 'MINS TO EMPTY';
+            
+            sendWS({ type: "set_power_source", source: mode });
+        }
+
+        function updatePumpUI() {
+            const m = document.getElementById('input-pump-mode').value;
+            document.getElementById('pump-pwm-ui').style.display = m === 'MANUAL_PWM' ? 'flex' : 'none';
+            document.getElementById('pump-rpm-ui').style.display = m === 'MANUAL_RPM' ? 'flex' : 'none';
+        }
+
+        function updateBlowerUI() {
+            const m = document.getElementById('input-blower-mode').value;
+            document.getElementById('blower-rpm-ui').style.display = m === 'MANUAL_RPM' ? 'flex' : 'none';
+        }
+
+        function syncVal(kind, fromNum=false) {
+            const slider = document.getElementById(`input-${kind}-pwm`);
+            const num = document.getElementById(`input-${kind}-pwm-num`);
+            const val = fromNum ? num.value : slider.value;
+            slider.value = val; num.value = val;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.chart-view, .chart-view-dual').forEach(v => v.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function toggleFullscreen() {
+            const panel = document.getElementById('chart-panel');
+            const btn = document.getElementById('btn-fullscreen');
+            panel.classList.toggle('fullscreen-active');
+            
+            if (panel.classList.contains('fullscreen-active')) {
+                btn.innerText = '✕ Exit Fullscreen';
+                // Resize charts up to fit the full screen
+                Object.values(charts).forEach(c => c.resize());
+            } else {
+                btn.innerText = '⛶ Fullscreen';
+                
+                // 1. Temporarily crush the canvas dimensions to 0 
+                // so the CSS Grid can snap back to its original layout
+                Object.values(charts).forEach(c => {
+                    c.canvas.style.width = '0px';
+                    c.canvas.style.height = '0px';
+                });
+                
+                // 2. Wait for the browser to finish snapping the grid back, 
+                // then restore the charts to 100% of their new smaller containers
+                requestAnimationFrame(() => {
+                    Object.values(charts).forEach(c => {
+                        c.canvas.style.width = '100%';
+                        c.canvas.style.height = '100%';
+                        c.resize();
+                    });
+                });
+            }
+        }
+
+        /* --- WEBSOCKET ENGINE --- */
+        function connectWS() {
+            DOM.statusIndicator.className = 'status-indicator disconnected';
+            DOM.statusText.innerText = 'DISCONNECTED';
+            ws = new WebSocket(CONFIG.WS_URL);
+            
+            ws.onopen = () => { stageParameters(); };
+            ws.onclose = () => { setTimeout(connectWS, CONFIG.RECONNECT_MS); };
+            ws.onerror = () => ws.close();
+            
+            ws.onmessage = (event) => {
+                const d = JSON.parse(event.data);
+
+                if (d.sim_event === "error") {
+                    DOM.statusIndicator.className = 'status-indicator disconnected';
+                    DOM.statusText.innerText = 'SIM ERROR';
+                    document.getElementById('btn-run-sim').disabled = true;
+                    document.getElementById('stage-banner').style.display = 'block';
+                    isStaged = false;
+                    alert('⚠ Simulation crashed on the Python side:\n\n' + d.message +
+                          '\n\nAdjust the offending parameter (an orifice of 0mm is a common cause) and click "Apply Parameters & Stage Sim" again.');
+                    return;
+                }
+                if (d.sim_event === "complete") {
+                    DOM.statusText.innerText = 'RUN COMPLETE';
+                    return;
+                }
+
+                requestAnimationFrame(() => { updateUI(d); appendChartData(d); });
+            };
+        }
 
         const DOM = {
             statusIndicator: document.getElementById('conn-status'),
             statusText: document.getElementById('conn-text'),
-            clock: document.getElementById('sim-clock'),
-            dispMode: document.getElementById('disp-mode-name'),
-            dispFlow: document.getElementById('disp-mode-flow'),
-            dispIE: document.getElementById('disp-mode-ie')
+            clock: document.getElementById('sim-clock')
         };
 
-        function connectWS() {
-            updateStatus('connecting');
-            ws = new WebSocket(CONFIG.WS_URL);
-            
-            ws.onopen = () => updateStatus('live');
-            ws.onclose = () => { updateStatus('disconnected'); setTimeout(connectWS, CONFIG.RECONNECT_MS); };
-            ws.onerror = () => ws.close();
-            
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                processIncomingData(data);
-                // If sim stops while viewing live, stay live (or change based on preference)
-            };
-        }
-
-        function updateStatus(state) {
-            DOM.statusIndicator.className = `status-indicator ${state}`;
-            DOM.statusText.innerText = state.toUpperCase();
-        }
-
-        function sendWS(obj) {
-            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
-        }
-
-        function processIncomingData(d) {
-            history.t.push(d.t);
-            history.flow_target.push(d.mode.flowrate_target_lpm);
-            history.flow_del.push(d.flowrate_delivered_lpm);
-            history.tank_p.push(d.tank_pressure_bar ?? d.tank_pressure_kpa);
-            history.rpm.push(d.motor.rpm);
-            history.power.push(d.motor.power_w);
-            history.soc.push(d.battery.soc_pct);
-            history.pwm.push(d.blower_pwm_pct);
-            history.total_drain.push(d.drain.total_lpm);
-            history.total_pd.push(d.pressure_drop.total_kpa);
-            history.motor_temp.push(d.motor.temp_c);
-            history.head_temp.push(d.pump_head_temp_c);
-            history.battery_voltage.push(d.battery.voltage_v);
-            history.battery_derating.push(d.battery.derating_multiplier * 100.0);
-            history.battery_fan_pwm.push(d.battery.fan_pwm);
-            history.pump_command_pwm.push(d.control ? d.control.pump_command_pwm_pct : (d.motor.rpm / 3000.0) * 100.0);
-
-            lastTimestamp = d.t;
-
-            if (!updatePending) {
-                updatePending = true;
-                requestAnimationFrame(() => { updateUI(d); updateCharts(); updatePending = false; });
-            }
-        }
-
-        function formatTime(secs) {
-            const m = Math.floor(secs / 60).toString().padStart(2, '0');
-            const s = Math.floor(secs % 60).toString().padStart(2, '0');
-            const ms = Math.floor((secs % 1) * 1000).toString().padStart(3, '0');
-            return `${m}:${s}.${ms}`;
-        }
-
         function updateUI(d) {
-            DOM.clock.innerText = formatTime(d.t);
-            DOM.dispMode.innerText = d.mode.name;
-            DOM.dispFlow.innerText = d.mode.flowrate_target_lpm.toFixed(1);
-            DOM.dispIE.innerText = `${d.mode.ti_s.toFixed(1)}:${d.mode.te_s.toFixed(1)}`;
+            DOM.clock.innerText = (d.t / 60).toFixed(0).padStart(2, '0') + ':' + (d.t % 60).toFixed(2).padStart(5, '0');
+            
+            // Flow & Drain Lists
+            document.getElementById('val-flow-vent').innerText = (d.flowrate_delivered_lpm || 0).toFixed(1);
+            document.getElementById('val-flow-comp').innerText = (d.flow_cascade?.compressor_out || 0).toFixed(1);
+            document.getElementById('val-flow-demand').innerText = (d.mode?.flowrate_target_lpm || 0).toFixed(1);
+            document.getElementById('val-flow-tank').innerText = (d.flow_cascade?.tank_in || 0).toFixed(1);
+            
+            document.getElementById('val-drain-total').innerText = (d.drain?.total_lpm || 0).toFixed(2);
+            document.getElementById('val-drain-tank').innerText = (d.drain?.tank_lpm || 0).toFixed(2);
+            document.getElementById('val-drain-af').innerText = (d.drain?.air_filter_lpm || 0).toFixed(2);
+            document.getElementById('val-drain-ws').innerText = (d.drain?.water_separator_lpm || 0).toFixed(2);
+            document.getElementById('val-drain-ms').innerText = (d.drain?.mist_separator_lpm || 0).toFixed(2);
 
-            updateGauge('flow', d.flowrate_delivered_lpm, d.mode.flowrate_target_lpm);
-            updateGauge('rpm', d.motor.rpm);
-            updateGauge('tank', d.tank_pressure_bar ?? d.tank_pressure_kpa);
-            updateGauge('power', d.motor.power_w);
+            // Pressure Cascade List
+            document.getElementById('val-press-tank').innerText = (d.tank_pressure_bar || 0).toFixed(2);
+            const p = d.pressure_cascade || {};
+            document.getElementById('val-p-hepa').innerText = (p.hepa || 0).toFixed(2);
+            document.getElementById('val-p-silencer').innerText = (p.silencer || 0).toFixed(2);
+            document.getElementById('val-p-intake').innerText = (p.intake_hose || 0).toFixed(2);
+            document.getElementById('val-p-comp').innerText = (p.compressor || 0).toFixed(2);
+            document.getElementById('val-p-disch').innerText = (p.discharge_hose || 0).toFixed(2);
+            document.getElementById('val-p-coil').innerText = (p.coil || 0).toFixed(2);
+            document.getElementById('val-p-nrv').innerText = (p.nrv || 0).toFixed(2);
+            document.getElementById('val-p-af').innerText = (p.air_filter || 0).toFixed(2);
+            document.getElementById('val-p-ws').innerText = (p.water_sep || 0).toFixed(2);
+            document.getElementById('val-p-ms').innerText = (p.mist_sep || 0).toFixed(2);
 
-            const ambient = d.ambient_temp_c || 25.0; 
-            document.getElementById('val-ambient').innerText = ambient.toFixed(1);
+            // Power Meter Fill
+            const pwr = d.motor?.power_w || 0;
+            document.getElementById('val-power-w').innerText = pwr.toFixed(1);
+            document.getElementById('power-bar-fill').style.width = Math.min(100, (pwr / 800) * 100) + '%';
 
+            // Digital Tachometer
+            document.getElementById('val-rpm-digital').innerText = Math.round(d.motor?.rpm || 0).toString().padStart(4, '0');
+
+            // Thermals
             renderThermalBars([
-                { id: 'head', label: 'Head Temp', val: d.pump_head_temp_c, max: 120, warn: 80, crit: 95 },
-                { id: 'motor', label: 'Motor Temp', val: d.motor.temp_c, max: 120, warn: 85, crit: 100 },
-                { id: 'battery', label: 'Batt Temp', val: d.battery.temp_c, max: 80, warn: 45, crit: 55 }
+                { id: 'motor', label: 'Motor Core', val: d.motor?.temp_c || 25, max: 120, warn: 85, crit: 100 },
+                { id: 'head', label: 'Pump Head', val: d.pump_head_temp_c || 25, max: 120, warn: 80, crit: 95 },
+                { id: 'battery', label: 'Battery Core', val: d.battery?.temp_c || 25, max: 80, warn: 45, crit: 55 }
             ]);
 
-            document.getElementById('bms-volts').innerText = d.battery.voltage_v.toFixed(1);
-            const soc = document.getElementById('bms-soc');
-            soc.innerText = d.battery.soc_pct.toFixed(0);
-            soc.className = d.battery.soc_pct > 20 ? 'c-ok' : 'c-crit';
+            // BMS Updates
+            document.getElementById('bms-volts').innerText = (d.battery?.voltage_v || 0).toFixed(1);
+            document.getElementById('bms-soc').innerText = (d.battery?.soc_pct || 0).toFixed(0);
             
-            const bmsTemp = document.getElementById('bms-temp');
-            bmsTemp.innerText = d.battery.temp_c.toFixed(1);
-            bmsTemp.className = d.battery.temp_c < 45 ? '' : 'c-crit';
-
-            document.getElementById('bms-time').innerText = d.battery.time_remaining_min > 999 ? '∞' : d.battery.time_remaining_min.toFixed(0);
-            
-            const bmsText = document.getElementById('bms-status-text');
-            bmsText.innerText = d.battery.status;
-            if (d.battery.status.includes("AC Connected") || d.battery.status.includes("Charging")) {
-                bmsText.className = "bms-status bg-ac";
-            } else if (d.battery.soc_pct <= 15) {
-                bmsText.className = "bms-status bg-crit";
-            } else {
-                bmsText.className = "bms-status bg-alert";
-            }
-
-            document.getElementById('val-drain-total').innerText = d.drain.total_lpm.toFixed(2);
-            renderBars('drain-breakdown', [
-                { label: 'Air Filt', val: d.drain.air_filter_lpm, max: 2.0 },
-                { label: 'Water Sep', val: d.drain.water_separator_lpm, max: 2.0 },
-                { label: 'Mist Sep', val: d.drain.mist_separator_lpm, max: 2.0 }
-            ]);
-
-            document.getElementById('val-pd-total').innerText = d.pressure_drop.total_kpa.toFixed(1);
-            renderBars('pd-breakdown', [
-                { label: 'HEPA', val: d.pressure_drop.hepa_kpa, max: 5.0 },
-                { label: 'Post Pump', val: d.pressure_drop.post_pump_kpa, max: 20.0 },
-                { label: 'Hose', val: d.pressure_drop.hose_kpa, max: 3.0 },
-                { label: 'Coil', val: d.pressure_drop.cooling_coil_kpa, max: 5.0 },
-                { label: 'Air Filt', val: d.pressure_drop.air_filter_kpa, max: 3.0 },
-                { label: 'Water Sep', val: d.pressure_drop.water_separator_kpa, max: 3.0 },
-                { label: 'Mist Sep', val: d.pressure_drop.mist_separator_kpa, max: 3.0 }
-            ]);
+            // Populating the restored time remaining block
+            const timeRem = d.battery?.time_remaining_min || 0;
+            document.getElementById('bms-time').innerText = timeRem > 999 ? '∞' : timeRem.toFixed(0);
         }
 
         function renderThermalBars(items) {
             const container = document.getElementById('thermal-bars-container');
             if (container.children.length === 0) {
-                let html = '';
-                items.forEach(item => {
-                    html += `
-                        <div class="temp-row">
-                            <div class="temp-label">${item.label}</div>
-                            <div class="temp-track"><div class="temp-fill" id="t-fill-${item.id}"></div></div>
-                            <div class="temp-val" id="t-val-${item.id}">0.0</div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
+                container.innerHTML = items.map(item => `
+                    <div class="temp-row">
+                        <div class="temp-label">${item.label}</div>
+                        <div class="temp-track"><div class="temp-fill" id="t-fill-${item.id}"></div></div>
+                        <div class="temp-val" id="t-val-${item.id}">0.0°</div>
+                    </div>
+                `).join('');
             }
-
             items.forEach(item => {
-                const valEl = document.getElementById(`t-val-${item.id}`);
                 const fillEl = document.getElementById(`t-fill-${item.id}`);
-                if (!valEl || !fillEl) return;
-
-                valEl.innerText = item.val.toFixed(1) + '°';
+                document.getElementById(`t-val-${item.id}`).innerText = item.val.toFixed(1) + '°';
                 const pct = Math.min(100, Math.max(0, (item.val / item.max) * 100));
                 fillEl.style.width = pct + '%';
-
-                if (item.val >= item.crit) {
-                    fillEl.style.backgroundColor = 'var(--crit-red)';
-                } else if (item.val >= item.warn) {
-                    fillEl.style.backgroundColor = 'var(--alert-amber)';
-                } else {
-                    fillEl.style.backgroundColor = 'var(--ok-green)';
-                }
+                fillEl.style.backgroundColor = item.val >= item.crit ? 'var(--crit-red)' : item.val >= item.warn ? 'var(--alert-amber)' : 'var(--ok-green)';
             });
         }
 
-        function renderBars(containerId, items) {
-            const container = document.getElementById(containerId);
-            let html = '';
-            items.forEach(item => {
-                const pct = Math.min(100, Math.max(0, (item.val / item.max) * 100));
-                html += `
-                    <div class="bar-row">
-                        <div class="bar-label">${item.label}</div>
-                        <div class="bar-track"><div class="bar-fill" style="width: ${pct}%"></div></div>
-                        <div class="bar-val">${item.val.toFixed(1)}</div>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-        }
+        /* --- CHART.JS ENGINE --- */
+        let charts = {};
 
-        function loadPreset() {
-            const sel = document.getElementById('input-preset').value;
-            if (CONFIG.PRESETS[sel]) {
-                const p = CONFIG.PRESETS[sel];
-                document.getElementById('input-flow').value = p.flow;
-                document.getElementById('input-exp-flow').value = p.exp_flow;
-                document.getElementById('input-ti').value = p.ti;
-                document.getElementById('input-te').value = p.te;
-            }
-        }
+        function initCharts() {
+            Chart.defaults.color = '#94A3B8';
+            Chart.defaults.font.family = "'Rajdhani', sans-serif";
 
-        function markCustom() { document.getElementById('input-preset').value = "Custom"; }
+            // const opt = { responsive: true, maintainAspectRatio: false, animation: false, elements: { point: { radius: 0 } } };
 
-        function sendNewMode() {
-            const name = document.getElementById('input-preset').value;
-            const flow = parseFloat(document.getElementById('input-flow').value);
-            const exp_flow = parseFloat(document.getElementById('input-exp-flow').value);
-            const ti = parseFloat(document.getElementById('input-ti').value);
-            const te = parseFloat(document.getElementById('input-te').value);
-            sendWS({ type: "set_mode", name: name, flowrate_target_lpm: flow, flowrate_exp_lpm: exp_flow, ti_s: ti, te_s: te });
-        }
 
-        function sendSimControl(action) { sendWS({ type: "sim_control", action }); }
-
-        function sendSimSpeed() {
-            const input = document.getElementById('input-sim-speed');
-            const value = Math.max(0.1, Number(input.value) || 1.0);
-            input.value = value;
-            sendWS({ type: "set_sim_speed", multiplier: value });
-        }
-
-        function clampPct(value) {
-            const n = Number(value);
-            if (!Number.isFinite(n)) return 0;
-            return Math.min(100, Math.max(0, n));
-        }
-
-        function syncControlValue(kind, fromNumber=false) {
-            const slider = document.getElementById(`input-${kind}-pwm`);
-            const num = document.getElementById(`input-${kind}-pwm-num`);
-            const value = clampPct(fromNumber ? num.value : slider.value);
-            slider.value = value;
-            num.value = value;
-        }
-
-        function sendPumpControl() {
-            syncControlValue('pump');
-            sendWS({
-                type: "set_pump_control",
-                mode: document.getElementById('input-pump-mode').value,
-                command_mode: document.getElementById('input-pump-command-mode').value,
-                pwm_pct: clampPct(document.getElementById('input-pump-pwm').value),
-                target_rpm: Math.max(0, Number(document.getElementById('input-pump-rpm').value) || 0)
-            });
-        }
-
-        function updatePumpCommandUI() {
-            const commandMode = document.getElementById('input-pump-command-mode').value;
-            document.getElementById('pump-rpm-control').style.display = commandMode === 'RPM' ? 'flex' : 'none';
-        }
-
-        function sendBlowerControl() {
-            syncControlValue('blower');
-            sendWS({
-                type: "set_blower_control",
-                mode: document.getElementById('input-blower-mode').value,
-                pwm_pct: clampPct(document.getElementById('input-blower-pwm').value)
-            });
-        }
-
-        /* =========================================
-           MOTORSPORTS NEEDLE GAUGES
-           ========================================= */
-        const gaugesData = {};
-
-        function initGauges() {
-            Object.values(CONFIG.GAUGES).forEach(g => {
-                gaugesData[g.id] = { ...g };
-                const container = document.getElementById(g.target);
-                if (container) {
-                    container.innerHTML += buildGaugeHTML(g);
-                }
-            });
-        }
-
-        function polarToCartesian(cx, cy, r, angleDeg) {
-            const rad = (angleDeg - 90) * Math.PI / 180.0;
-            return { x: cx + (r * Math.cos(rad)), y: cy + (r * Math.sin(rad)) };
-        }
-        
-        function describeArc(cx, cy, r, startAngle, endAngle) {
-            const start = polarToCartesian(cx, cy, r, endAngle);
-            const end = polarToCartesian(cx, cy, r, startAngle);
-            const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-            return ["M", start.x, start.y, "A", r, r, 0, largeArcFlag, 0, end.x, end.y].join(" ");
-        }
-
-        function buildGaugeHTML(g) {
-            const cx = 100, cy = 100, r = 80;
-            const track = `<path d="${describeArc(cx, cy, r, -135, 135)}" fill="none" stroke="var(--border-color)" stroke-width="12" stroke-linecap="round"/>`;
-            
-            let redlinePath = "";
-            if (g.redline !== undefined) {
-                const range = g.range[1] - g.range[0];
-                const angle = -135 + ((g.redline - g.range[0]) / range) * 270;
-                redlinePath = `<path d="${describeArc(cx, cy, r, angle, 135)}" fill="none" stroke="rgba(239, 68, 68, 0.25)" stroke-width="12" stroke-linecap="round"/>`;
-            }
-
-            let ticks = "";
-            for(let v=g.range[0]; v<=g.range[1]; v+=g.ticks) {
-                const angle = -135 + ((v - g.range[0]) / (g.range[1]-g.range[0])) * 270;
-                const p1 = polarToCartesian(cx, cy, r-15, angle);
-                const p2 = polarToCartesian(cx, cy, r-2, angle);
-                ticks += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round"/>`;
-            }
-
-            return `
-                <div class="gauge-container">
-                    <svg viewBox="0 0 200 180" class="gauge-svg">
-                        ${track}
-                        ${redlinePath}
-                        ${ticks}
-                        <polygon id="g-${g.id}-target" points="95,12 105,12 100,22" fill="var(--primary)" style="display:none; transform-origin: 100px 100px;" />
-                        
-                        // <path id="g-${g.id}-fill" fill="none" stroke="var(--primary)" stroke-width="12" stroke-linecap="round" style="transition: d 0.05s linear;" d=""/>
-                        <path id="g-${g.id}-fill" fill="none" stroke="var(--primary)" stroke-width="12" stroke-linecap="round" d=""/>
-                        <g id="g-${g.id}-needle-group" style="transform-origin: 100px 100px; transform: rotate(-135deg); transition: transform 0.08s cubic-bezier(0.2, 1, 0.3, 1);">
-                            <polygon points="96,102 104,102 100,20" fill="rgba(0,0,0,0.1)" />
-                            <polygon points="97,100 103,100 100,18" fill="var(--crit-red)" />
-                            <circle cx="100" cy="100" r="8" fill="var(--text-dark)" />
-                            <circle cx="100" cy="100" r="3" fill="#ffffff" />
-                        </g>
-                    </svg>
-                    <div class="gauge-val" id="g-${g.id}-val">0</div>
-                    <div class="gauge-label">${g.label} (${g.unit})</div>
-                </div>
-            `;
-        }
-
-        function updateGauge(id, val, targetVal=null) {
-            const g = gaugesData[id];
-            const range = g.range[1] - g.range[0];
-            const clamped = Math.min(Math.max(val, g.range[0]), g.range[1]);
-            
-            const decimals = g.unit === 'bar' ? 1 : 0;
-            document.getElementById(`g-${id}-val`).innerText = val.toFixed(decimals);
-
-            let color = 'var(--primary)';
-            if (g.redline !== undefined && clamped >= g.redline) {
-                color = 'var(--crit-red)';
-            }
-
-            const endAngle = -135 + ((clamped - g.range[0]) / range) * 270;
-            
-            const path = document.getElementById(`g-${id}-fill`);
-            if (endAngle > -134.9) { 
-                path.setAttribute('d', describeArc(100, 100, 80, -135, endAngle));
-                path.setAttribute('stroke', color);
-            } else {
-                path.setAttribute('d', '');
-            }
-
-            document.getElementById(`g-${id}-needle-group`).style.transform = `rotate(${endAngle}deg)`;
-
-            if (targetVal !== null) {
-                const targetMarker = document.getElementById(`g-${id}-target`);
-                targetMarker.style.display = 'block';
-                const targetAngle = -135 + ((targetVal - g.range[0]) / range) * 270;
-                targetMarker.style.transform = `rotate(${targetAngle}deg)`;
-            }
-        }
-
-        /* =========================================
-           CHARTS & MODAL LOGIC
-           ========================================= */
-        const charts = {};
-        const chartOptions = {
-            responsive: true, maintainAspectRatio: false, animation: false, 
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { labels: { color: '#1E293B', font: { family: "'Rajdhani', sans-serif", weight: 'bold' } } },
-                zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } }
+           const opt = { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            animation: false, 
+            elements: { 
+                point: { 
+                    radius: 0, 
+                    hitRadius: 10,     // Creates an invisible 10px catch area for your mouse
+                    hoverRadius: 4     // Makes the point pop up to 4px when hovered
+                } 
+            },
+            interaction: {
+                mode: 'index',         // Groups all data points at the same time (x-axis)
+                intersect: false       // Triggers even if you aren't directly touching the line
             },
             scales: {
-                x: { type: 'linear', grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => formatTime(v) } },
-                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b' } }
+                x: { 
+                    type: 'linear', 
+                    position: 'bottom',
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94A3B8' }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94A3B8' }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#F8FAFC' } },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)', // Deep slate background
+                    titleColor: '#00B4D8',                     // Teal title (Time)
+                    bodyColor: '#F8FAFC',                      // White text
+                    borderColor: '#334155',                    // Slate border
+                    borderWidth: 1,
+                    padding: 10
+                }
             }
         };
 
-        function initCharts() {
-            Chart.defaults.color = '#1E293B';
-            Chart.defaults.font.family = "'Rajdhani', sans-serif";
-
-            charts.flow = new Chart(document.getElementById('chart-flow'), {
-                type: 'line',
-                data: { datasets: [
-                    { label: 'Flow (Delivered)', data: [], borderColor: '#0066CC', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-                    { label: 'Flow (Target)', data: [], borderColor: '#F59E0B', borderWidth: 2, borderDash: [5,5], pointRadius: 0, tension: 0 }
-                ]},
-                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Flow (LPM)', color: '#64748b', font:{weight:'bold'} } } }
-            });
-
             charts.pressure = new Chart(document.getElementById('chart-pressure'), {
                 type: 'line',
-                data: { datasets: [ { label: 'Tank Pressure', data: [], borderColor: '#10B981', borderWidth: 2, pointRadius: 0, tension: 0.1 } ] },
-                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Pressure (bar)', color: '#64748b', font:{weight:'bold'} } } }
+                data: { datasets: [
+                    { label: 'Compressor', borderColor: '#EF4444', data: [] },
+                    { label: 'Disch Hose', borderColor: '#F97316', data: [] },
+                    { label: 'Coil Out', borderColor: '#F59E0B', data: [] },
+                    { label: 'NRV Out', borderColor: '#EAB308', data: [] },
+                    { label: 'Air Filter', borderColor: '#10B981', data: [] },
+                    { label: 'Water Sep', borderColor: '#3B82F6', data: [] },
+                    { label: 'Mist Sep', borderColor: '#8B5CF6', data: [] },
+                    { label: 'Tank', borderColor: '#00B4D8', data: [] }
+                ]}, options: JSON.parse(JSON.stringify(opt))
             });
 
-            charts.motor = new Chart(document.getElementById('chart-motor'), {
+            charts.flowMain = new Chart(document.getElementById('chart-flow-main'), {
                 type: 'line',
                 data: { datasets: [
-                    { label: 'Batt SOC %', data: [], yAxisID: 'y1', borderColor: '#F59E0B', borderWidth: 2, pointRadius: 0 },
-                    { label: 'RPM', data: [], yAxisID: 'y', borderColor: '#1E293B', borderWidth: 2, pointRadius: 0 }
-                ]},
-                options: { ...chartOptions, scales: { x: chartOptions.scales.x, y: { type: 'linear', position: 'left', grid: { color: '#e2e8f0' } }, y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, min: 0, max: 100 } } }
+                    { label: 'Target Demand', borderColor: '#F59E0B', borderDash: [4,4], data: [] },
+                    { label: 'Compressor Supply', borderColor: '#00B4D8', data: [] },
+                    { label: 'Supply to Tank', borderColor: '#10B981', data: [] },
+                    { label: 'Delivered to Vent', borderColor: '#8B5CF6', data: [] }
+                ]}, options: JSON.parse(JSON.stringify(opt))
+            });
+
+            charts.flowDrain = new Chart(document.getElementById('chart-flow-drain'), {
+                type: 'line',
+                data: { datasets: [
+                    { label: 'Total Drain', borderColor: '#EF4444', data: [] },
+                    { label: 'Air Filter', borderColor: '#F59E0B', data: [] },
+                    { label: 'Water Sep', borderColor: '#3B82F6', data: [] },
+                    { label: 'Mist Sep', borderColor: '#8B5CF6', data: [] },
+                    { label: 'Tank Drain', borderColor: '#64748B', data: [] }
+                ]}, options: JSON.parse(JSON.stringify(opt))
             });
 
             charts.thermal = new Chart(document.getElementById('chart-thermal'), {
                 type: 'line',
                 data: { datasets: [
-                    { label: 'Motor Temp', data: [], borderColor: '#EF4444', borderWidth: 2, pointRadius: 0 },
-                    { label: 'Head Temp', data: [], borderColor: '#F59E0B', borderWidth: 2, pointRadius: 0 }
-                ]},
-                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Thermal (deg C)', color: '#64748b', font:{weight:'bold'} } } }
+                    { label: 'Motor Temp', borderColor: '#EF4444', data: [] },
+                    { label: 'Pump Head', borderColor: '#F59E0B', data: [] },
+                    { label: 'Battery Core', borderColor: '#10B981', data: [] }
+                ]}, options: JSON.parse(JSON.stringify(opt))
             });
 
-            charts.electrical = new Chart(document.getElementById('chart-electrical'), {
-                type: 'line',
-                data: { datasets: [
-                    { label: 'Power W', data: [], yAxisID: 'y', borderColor: '#1E293B', borderWidth: 2, pointRadius: 0 },
-                    { label: 'Battery V', data: [], yAxisID: 'y1', borderColor: '#0066CC', borderWidth: 2, pointRadius: 0 },
-                    { label: 'Derating %', data: [], yAxisID: 'y2', borderColor: '#10B981', borderWidth: 2, pointRadius: 0 }
-                ]},
-                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Electrical / Derating', color: '#64748b', font:{weight:'bold'} } }, scales: { x: chartOptions.scales.x, y: { type: 'linear', position: 'left', grid: { color: '#e2e8f0' } }, y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, min: 18, max: 28 }, y2: { type: 'linear', display: false, min: 0, max: 100 } } }
-            });
+            const powerOpt = JSON.parse(JSON.stringify(opt));
+            // Three independent Y axes so wildly different ranges (W vs RPM vs RPM)
+            // can share one canvas without squashing each other's trend.
+            powerOpt.scales.y = {
+                type: 'linear', position: 'left',
+                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                ticks: { color: '#00B4D8' },
+                title: { display: true, text: 'Power (W)', color: '#00B4D8' }
+            };
+            powerOpt.scales.y1 = {
+                type: 'linear', position: 'right',
+                grid: { drawOnChartArea: false },
+                ticks: { color: '#F59E0B' },
+                title: { display: true, text: 'Motor RPM', color: '#F59E0B' }
+            };
+            powerOpt.scales.y2 = {
+                type: 'linear', position: 'right',
+                grid: { drawOnChartArea: false },
+                ticks: { color: '#8B5CF6' },
+                title: { display: true, text: 'Blower RPM', color: '#8B5CF6' },
+                offset: true
+            };
 
-            charts.control = new Chart(document.getElementById('chart-control'), {
+            charts.power = new Chart(document.getElementById('chart-power'), {
                 type: 'line',
                 data: { datasets: [
-                    { label: 'Pump Cmd %', data: [], borderColor: '#0066CC', borderWidth: 2, pointRadius: 0 },
-                    { label: 'Blower PWM %', data: [], borderColor: '#F59E0B', borderWidth: 2, pointRadius: 0 },
-                    { label: 'Battery Fan %', data: [], borderColor: '#10B981', borderWidth: 2, pointRadius: 0 }
-                ]},
-                options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: 'Control Outputs (%)', color: '#64748b', font:{weight:'bold'} } }, scales: { x: chartOptions.scales.x, y: { min: 0, max: 100, grid: { color: '#e2e8f0' } } } }
+                    { label: 'Power (Watts)', borderColor: '#00B4D8', data: [], yAxisID: 'y' },
+                    { label: 'Motor RPM', borderColor: '#F59E0B', data: [], yAxisID: 'y1' },
+                    { label: 'Blower RPM', borderColor: '#8B5CF6', data: [], yAxisID: 'y2' }
+                ]}, options: powerOpt
             });
         }
 
-        function updateCharts() {
-            if (history.t.length === 0) return;
-            const ts = history.t;
+        function appendChartData(d) {
+            const t = d.t;
             
-            charts.flow.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.flow_del[i]}));
-            charts.flow.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.flow_target[i]}));
-            charts.pressure.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.tank_p[i]}));
-            charts.motor.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.soc[i]}));
-            charts.motor.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.rpm[i]}));
-            charts.thermal.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.motor_temp[i]}));
-            charts.thermal.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.head_temp[i]}));
-            charts.electrical.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.power[i]}));
-            charts.electrical.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.battery_voltage[i]}));
-            charts.electrical.data.datasets[2].data = ts.map((t, i) => ({x: t, y: history.battery_derating[i]}));
-            charts.control.data.datasets[0].data = ts.map((t, i) => ({x: t, y: history.pump_command_pwm[i]}));
-            charts.control.data.datasets[1].data = ts.map((t, i) => ({x: t, y: history.pwm[i]}));
-            charts.control.data.datasets[2].data = ts.map((t, i) => ({x: t, y: history.battery_fan_pwm[i]}));
+            const p = d.pressure_cascade || {};
+            charts.pressure.data.datasets[0].data.push({x: t, y: p.compressor});
+            charts.pressure.data.datasets[1].data.push({x: t, y: p.discharge_hose});
+            charts.pressure.data.datasets[2].data.push({x: t, y: p.coil});
+            charts.pressure.data.datasets[3].data.push({x: t, y: p.nrv});
+            charts.pressure.data.datasets[4].data.push({x: t, y: p.air_filter});
+            charts.pressure.data.datasets[5].data.push({x: t, y: p.water_sep});
+            charts.pressure.data.datasets[6].data.push({x: t, y: p.mist_sep});
+            charts.pressure.data.datasets[7].data.push({x: t, y: d.tank_pressure_bar});
 
-            // Only snap to the latest window if we are NOT in review mode
-            if (viewMode === 'LIVE') {
-                const maxT = lastTimestamp;
-                const minT = Math.max(0, maxT - CONFIG.LIVE_WINDOW_SECONDS);
-                Object.values(charts).forEach(c => {
-                    c.options.scales.x.min = minT; c.options.scales.x.max = maxT; c.update('none'); 
+            charts.flowMain.data.datasets[0].data.push({x: t, y: d.mode?.flowrate_target_lpm});
+            charts.flowMain.data.datasets[1].data.push({x: t, y: d.flow_cascade?.compressor_out});
+            charts.flowMain.data.datasets[2].data.push({x: t, y: d.flow_cascade?.tank_in});
+            charts.flowMain.data.datasets[3].data.push({x: t, y: d.flowrate_delivered_lpm});
+
+            const dr = d.drain || {};
+            charts.flowDrain.data.datasets[0].data.push({x: t, y: dr.total_lpm});
+            charts.flowDrain.data.datasets[1].data.push({x: t, y: dr.air_filter_lpm});
+            charts.flowDrain.data.datasets[2].data.push({x: t, y: dr.water_separator_lpm});
+            charts.flowDrain.data.datasets[3].data.push({x: t, y: dr.mist_separator_lpm});
+            charts.flowDrain.data.datasets[4].data.push({x: t, y: dr.tank_lpm});
+
+            charts.thermal.data.datasets[0].data.push({x: t, y: d.motor?.temp_c});
+            charts.thermal.data.datasets[1].data.push({x: t, y: d.pump_head_temp_c});
+            charts.thermal.data.datasets[2].data.push({x: t, y: d.battery?.temp_c});
+
+            charts.power.data.datasets[0].data.push({x: t, y: d.motor?.power_w});
+            charts.power.data.datasets[1].data.push({x: t, y: d.motor?.rpm});
+            charts.power.data.datasets[2].data.push({x: t, y: d.blower_rpm});
+
+            // --- ROLLING WINDOW LOGIC ---
+            const windowSize = parseFloat(document.getElementById('input-chart-window').value) || 60;
+            const currentT = d.t;
+            const minT = Math.max(0, currentT - windowSize);
+
+            Object.values(charts).forEach(c => {
+                // 1. Shift old data out of memory (keeping a small buffer so lines don't snap at the edge)
+                c.data.datasets.forEach(ds => {
+                    while (ds.data.length > 0 && ds.data[0].x < minT - 2.0) {
+                        ds.data.shift();
+                    }
                 });
-            } else {
-                Object.values(charts).forEach(c => c.update('none'));
-            }
-        }
-
-        // MODAL CONTROLS
-        function openAnalytics() {
-            document.getElementById('analytics-modal').classList.add('open');
-            viewMode = 'REVIEW'; // Pause scrolling
-            
-            // Release the fixed time window so you can see all historical data
-            Object.values(charts).forEach(c => { 
-                c.options.scales.x.min = undefined; 
-                c.options.scales.x.max = undefined; 
-                c.resize(); // Force resize inside new container
-                c.update(); 
+                
+                // 2. Lock the visual X-Axis to the moving window
+                if (c.options.scales.x) {
+                    c.options.scales.x.min = minT;
+                    c.options.scales.x.max = Math.max(windowSize, currentT);
+                }
+                
+                c.update('none');
             });
         }
 
-        function closeAnalytics() {
-            document.getElementById('analytics-modal').classList.remove('open');
-            viewMode = 'LIVE'; // Resume scrolling
-            
-            // Snap back to the current live window
-            Object.values(charts).forEach(c => { if (c.resetZoom) c.resetZoom(); });
+        function resetCharts() {
+            Object.values(charts).forEach(c => {
+                c.data.datasets.forEach(ds => ds.data = []);
+                c.update();
+            });
         }
 
-        function exportCSV() {
-            if (history.t.length === 0) return;
-            const headers = ['t', 'flow_target', 'flow_del', 'tank_p_bar', 'rpm', 'power', 'soc', 'pwm', 'total_drain', 'total_pd', 'motor_temp', 'head_temp', 'battery_voltage', 'battery_derating_pct', 'battery_fan_pwm', 'pump_command_pwm'];
-            const rows = [headers.join(',')];
-            for (let i = 0; i < history.t.length; i++) {
-                rows.push([history.t[i], history.flow_target[i], history.flow_del[i], history.tank_p[i], history.rpm[i], history.power[i], history.soc[i], history.pwm[i], history.total_drain[i], history.total_pd[i], history.motor_temp[i], history.head_temp[i], history.battery_voltage[i], history.battery_derating[i], history.battery_fan_pwm[i], history.pump_command_pwm[i]].join(','));
-            }
-            const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.setAttribute('hidden', ''); a.setAttribute('href', url); a.setAttribute('download', `telemetry_${new Date().getTime()}.csv`);
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        }
-
-        window.onload = () => { initGauges(); initCharts(); updatePumpCommandUI(); connectWS(); };
+        window.onload = () => { initCharts(); connectWS(); };
+        function sendWS(obj) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
     </script>
 </body>
 </html>

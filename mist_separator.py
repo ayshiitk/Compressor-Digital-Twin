@@ -1,6 +1,6 @@
 import numpy as np
 import math
-
+import Drain_leak_calc as dlc
 class SMC_AFM20_MistSeparator:
     """
     Digital Twin Component: SMC AFM20-F02-J-D Micro-Mist Separator
@@ -12,8 +12,10 @@ class SMC_AFM20_MistSeparator:
     4. Drain Leakage Vector: Empirically verified 1.8mm open 'J' Drain Guide.
     5. Coalescing Filtration: 99.9% capture efficiency of sub-micron aerosols.
     """
-    def __init__(self, valve_closed=False):
+    def __init__(self, valve_closed=False, D2=1.0):
         self.component_name = "SMC AFM20 Mist Separator"
+        self.Drain_leak = dlc.RestrictorFlowSolver()
+        self.drain_dia = D2  # mm, restrictor diameter for the drain hole (1.0mm for "J" option)
         
         # Thermodynamics & Fluid Constants
         self.R_air = 287.05      # Ideal gas constant J/(kg*K)
@@ -31,19 +33,19 @@ class SMC_AFM20_MistSeparator:
         # ---------------------------------------------------------
         # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
         # ---------------------------------------------------------
-        d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
-        d2_restrictor_m = 1.0 / 1000.0  # Added pipe restrictor
+        # d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
+        # d2_restrictor_m = D2 / 1000.0  # Added pipe restrictor
         
-        A1 = math.pi * (d1_bowl_m / 2.0)**2
-        A2 = math.pi * (d2_restrictor_m / 2.0)**2
+        # A1 = math.pi * (d1_bowl_m / 2.0)**2
+        # A2 = math.pi * (d2_restrictor_m / 2.0)**2
         
-        # Calculate the equivalent aerodynamic area of both holes in series
-        # self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
+        # # Calculate the equivalent aerodynamic area of both holes in series
+        # # self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
 
-        A_theoretical =  2.165e-7
-        self.drain_hole_area_m2 = A_theoretical
+        # A_theoretical =  2.165e-7
+        # # self.drain_hole_area_m2 = A_theoretical
         # self.drain_hole_area_m2 = A2
-        self.Cd_drain = 1  # Standard discharge coefficient
+        # self.Cd_drain = 1  # Standard discharge coefficient
 
     # def calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
     #     """
@@ -65,26 +67,26 @@ class SMC_AFM20_MistSeparator:
     #     return m_dot_leak
     
 
-    def calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
-        """Calculates the continuous air purge escaping through the restrictor."""
+    # def calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
+    #     """Calculates the continuous air purge escaping through the restrictor."""
         
-        # SAFETY CHECK: No leaking if valve is closed OR if system is in a vacuum!
-        if self.drain_valve_closed or P_in_pa <= P_atm_pa:
-            return 0.0 
+    #     # SAFETY CHECK: No leaking if valve is closed OR if system is in a vacuum!
+    #     if self.drain_valve_closed or P_in_pa <= P_atm_pa:
+    #         return 0.0 
             
-        pr = P_atm_pa / P_in_pa
-        gamma = 1.4
-        critical_ratio = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
+    #     pr = P_atm_pa / P_in_pa
+    #     gamma = 1.4
+    #     critical_ratio = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
         
-        # Calculate Mass Flow Rate leaking through the equivalent restrictor area
-        if pr <= critical_ratio:
-            # Choked (Sonic) Flow
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
-        else:
-            # Subsonic Flow
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2.0 * gamma / (gamma - 1.0)) / (self.R_air * T_in_k) * (pr ** (2.0/gamma) - pr ** ((gamma + 1.0)/gamma)))
+    #     # Calculate Mass Flow Rate leaking through the equivalent restrictor area
+    #     if pr <= critical_ratio:
+    #         # Choked (Sonic) Flow
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
+    #     else:
+    #         # Subsonic Flow
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2.0 * gamma / (gamma - 1.0)) / (self.R_air * T_in_k) * (pr ** (2.0/gamma) - pr ** ((gamma + 1.0)/gamma)))
             
-        return m_dot_leak
+    #     return m_dot_leak
 
     def calculate_pressure_drop(self, Q_nlpm, P_in_pa):
         """
@@ -119,7 +121,7 @@ class SMC_AFM20_MistSeparator:
         # The final, mathematically true pressure drop for this exact millisecond
         dp_actual_pa = dp_base_4bar * pressure_ratio 
         
-        return max(0.0, dp_actual_pa)
+        return max(0.0, dp_dry_base)
 
     # def update_state(self, m_dot_in_kg_s, P_in_pa, T_in_k, aerosol_water_in_mg_s, dt_seconds=1.0):
     #     """
@@ -167,8 +169,8 @@ class SMC_AFM20_MistSeparator:
         P_bowl_pa = max(0.0, P_in_pa - dp_pa)
         
         # 2. Leakage Check (Bleeds from the bowl at downstream pressure)
-        m_dot_leak_kg_s = self.calculate_leakage(P_bowl_pa, T_in_k)
-        leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
+        m_dot_leak_kg_s, leak_nlpm = self.Drain_leak.calculate_flow(self.drain_dia, P_bowl_pa, T_in_k)
+
         # if t % 10 ==0:
         #     print(f"Leakage Mass Flow_nlpm_mist: {leak_nlpm:.6f} nlpm at P_out_mist: {dp_pa/100000:.3f} Bar abs, T_in_mist: {T_in_k-273.15:.1f} °C")
 
@@ -189,7 +191,7 @@ class SMC_AFM20_MistSeparator:
         
         q_nlpm = (m_dot_effective / 1.204) * 60000.0
 
-        return P_bowl_pa, dp_pa, q_nlpm, water_escaped_mg_s
+        return P_bowl_pa, dp_pa/100, q_nlpm, water_escaped_mg_s, leak_nlpm, m_dot_effective
         # return {
         #     "P_out_pa": P_bowl_pa,
         #     "dp_pa": dp_pa,

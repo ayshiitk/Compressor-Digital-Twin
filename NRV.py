@@ -56,11 +56,12 @@ if __name__ == "__main__":
     nrv = SMC_AKH10_NRV()
     
     # Test conditions (E.g., 100 NLPM flow, 4.0 Bar abs inlet, 25°C temperature)
+    test_mass_flow = 100*2.155*1e5     # kg/s
     test_mass_flow = 0.002       # kg/s
     test_p_in_pa = 400000.0      # Pascals (4.0 Bar absolute)
     test_t_in_k = 273.15 + 25.0  # Kelvin
     
-    p_out, dp_mbar = nrv.calculate_valve_state(test_mass_flow, test_p_in_pa, test_t_in_k)
+    p_out, dp_mbar , t_out = nrv.calculate_valve_state(test_mass_flow, test_p_in_pa, test_t_in_k)
     
     print("=== STANDALONE SMC AKH10 NRV MODULE TEST ===")
     print(f"Inlet Pressure  : {test_p_in_pa / 100000.0:.3f} Bar absolute")

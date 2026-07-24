@@ -1,4 +1,5 @@
 import math
+import Drain_leak_calc as dlc
 
 class SMC_AF20_Filter:
     """
@@ -8,31 +9,18 @@ class SMC_AF20_Filter:
     Features an integrated Cramer's Rule solver to dynamically compute 
     viscous and inertial structural coefficients from raw datasheet coordinates.
     """
-    def __init__(self, point1_lpm = 300, point1_dp_mbar = 200, point2_lpm = 600, point2_dp_mbar = 700, p_cal_gauge_mpa=0.25, valve_closed=False):
+    def __init__(self, point1_lpm = 300, point1_dp_mbar = 200, point2_lpm = 600, point2_dp_mbar = 700, p_cal_gauge_mpa=0.25, valve_closed=False, D2=.95):
         # Universal Constants
         self.R_air = 287.05               # Specific gas constant for air (J/kg*K)
         self.rho_anr = 1.204              # Standard air density baseline (kg/m3)
         self.T_cal_k = 293.15             # Datasheet standard calibration temperature (20°C)
+
+        self.Drain_leak = dlc.RestrictorFlowSolver()
         
         # Leakage Configuration ("J" Option Auto-Drain)
         self.drain_valve_closed = valve_closed 
         
-        # ---------------------------------------------------------
-        # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
-        # ---------------------------------------------------------
-        d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
-        d2_restrictor_m = 1.0 / 1000.0  # Added pipe restrictor
-        
-        A1 = math.pi * (d1_bowl_m / 2.0)**2
-        A2 = math.pi * (d2_restrictor_m / 2.0)**2
-       
-        
-        # Calculate the equivalent aerodynamic area of both holes in series
-        # self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
-        A_theoretical =  2.165e-7
-        self.drain_hole_area_m2 = A_theoretical
-
-        self.Cd_drain = 1  # Standard discharge coefficient
+        self.drain_dia = D2  # mm, restrictor diameter for the drain hole (1.0mm for "J" option)
 
         # Self-Calibrate coefficients from chart anchor inputs
         self.alpha_viscous, self.beta_inertial = self._execute_factory_calibration(
@@ -77,44 +65,28 @@ class SMC_AF20_Filter:
         beta = ((X1 * dp2_pa) - (X2 * dp1_pa)) / D_determinant
         
         return alpha, beta
+    
 
     # def _calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
-    #     """Handles choked (sonic) vs subsonic leakage through the bowl drain hole."""
-    #     if self.drain_valve_closed or P_in_pa <= P_atm_pa: 
+    #     """Calculates the continuous air purge escaping through the restrictor."""
+        
+    #     # SAFETY CHECK: No leaking if valve is closed OR if system is in a vacuum!
+    #     if self.drain_valve_closed or P_in_pa <= P_atm_pa:
     #         return 0.0 
             
     #     pr = P_atm_pa / P_in_pa
     #     gamma = 1.4
-    #     critical_ratio = (2 / (gamma + 1)) ** (gamma / (gamma - 1))
+    #     critical_ratio = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
         
+    #     # Calculate Mass Flow Rate leaking through the equivalent restrictor area
     #     if pr <= critical_ratio:
-    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1)))
+    #         # Choked (Sonic) Flow
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
     #     else:
-    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2 * gamma / (gamma - 1)) / (self.R_air * T_in_k) * (pr ** (2/gamma) - pr ** ((gamma + 1)/gamma)))
-        
+    #         # Subsonic Flow
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2.0 * gamma / (gamma - 1.0)) / (self.R_air * T_in_k) * (pr ** (2.0/gamma) - pr ** ((gamma + 1.0)/gamma)))
+            
     #     return m_dot_leak
-    
-
-    def _calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
-        """Calculates the continuous air purge escaping through the restrictor."""
-        
-        # SAFETY CHECK: No leaking if valve is closed OR if system is in a vacuum!
-        if self.drain_valve_closed or P_in_pa <= P_atm_pa:
-            return 0.0 
-            
-        pr = P_atm_pa / P_in_pa
-        gamma = 1.4
-        critical_ratio = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
-        
-        # Calculate Mass Flow Rate leaking through the equivalent restrictor area
-        if pr <= critical_ratio:
-            # Choked (Sonic) Flow
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
-        else:
-            # Subsonic Flow
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2.0 * gamma / (gamma - 1.0)) / (self.R_air * T_in_k) * (pr ** (2.0/gamma) - pr ** ((gamma + 1.0)/gamma)))
-            
-        return m_dot_leak
 
     def calculate_filter_state(self, t,  m_dot_kg_s, P_in_pa, T_in_k, P_atm_pa=101325.0):
         """
@@ -123,7 +95,7 @@ class SMC_AF20_Filter:
         """
         # If no flow and tank is empty, exit cleanly
         if m_dot_kg_s <= 1e-7 and P_in_pa <= P_atm_pa:
-            return P_in_pa, 0.0, 0.0, 0.0, 0.0
+            return P_in_pa, 0.0, 0.0, 0.0
 
         # 1. Calculate live operational state properties
         mu = self._get_sutherland_viscosity(T_in_k)
@@ -140,15 +112,16 @@ class SMC_AF20_Filter:
         P_out_pa = max(P_atm_pa, P_in_pa - total_dp_pa)
 
         # 3. Calculate bowl leakage (driven by the pressure after the element drop)
-        m_dot_leak_kg_s = self._calculate_leakage(P_out_pa, T_in_k, P_atm_pa)
-        leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
+        m_dot_leak_kg_s,leak_nlpm = self.Drain_leak.calculate_flow(self.drain_dia, P_in_pa, T_in_k)
+
+
         # if t % 100 ==0:
         #     print(f"Leakage Mass Flow_nlpm: {leak_nlpm:.6f} kg/s at P_out: {P_out_pa/100000:.3f} Bar abs, T_in: {T_in_k-273.15:.1f} °C")
 
         # 4. Calculate actual surviving mass flow to send downstream
         m_dot_out_kg_s = max(0.0, m_dot_kg_s - m_dot_leak_kg_s)
 
-        return P_out_pa, total_dp_mbar, dp_viscous_pa / 100.0, dp_inertial_pa / 100.0, m_dot_out_kg_s
+        return P_out_pa, total_dp_mbar, m_dot_out_kg_s, leak_nlpm
         # return P_out_pa, total_dp_mbar, dp_viscous_pa / 100.0, dp_inertial_pa / 100.0, m_dot_out_kg_s, m_dot_leak_kg_s
 
 # =====================================================================
@@ -177,26 +150,25 @@ if __name__ == "__main__":
     p_inlet_pa = 387400.0         # Absolute pressure entering the filter housing
     t_inlet_k = 273.15 + 26.8     # Cooled air entering at 26.8°C
     
-    p_out_pa, total_dp, dp_v, dp_i, m_dot_out, m_dot_leak = filter_unit.calculate_filter_state(mass_flow_gas, p_inlet_pa, t_inlet_k)
+    p_out_pa, total_dp, m_dot_out, leak_nlpm = filter_unit.calculate_filter_state(1, mass_flow_gas, p_inlet_pa, t_inlet_k)
     
     # Convert masses back to NLPM for easy reading
     inlet_nlpm = (mass_flow_gas / filter_unit.rho_anr) * 60000.0
     out_nlpm = (m_dot_out / filter_unit.rho_anr) * 60000.0
-    leak_nlpm = (m_dot_leak / filter_unit.rho_anr) * 60000.0
     
-    print("=======================================================")
-    print("           SIMULATED CURRENT FILTER STATE              ")
-    print("=======================================================")
-    print(f"Inlet Line Pressure         : {p_inlet_pa / 100000.0:.3f} Bar absolute")
-    print(f"Operational Gas Temperature : {t_inlet_k - 273.15:.1f} °C")
-    print("-" * 55)
-    print(f"Viscous Shear Loss Element  : {dp_v:.3f} mBar")
-    print(f"Inertial Turbulent Path Loss: {dp_i:.3f} mBar")
-    print(f"TOTAL CLEAN ASSEMBLY DROP   : {total_dp:.3f} mBar")
-    print("-" * 55)
-    print(f"Absolute Pressure Leaving   : {p_out_pa / 100000.0:.4f} Bar absolute")
-    print("-" * 55)
-    print(f"Flow Requested (Inlet)      : {inlet_nlpm:.1f} NLPM")
-    print(f"Lost through 1.8mm Leak     : {leak_nlpm:.1f} NLPM")
-    print(f"Surviving Flow (Delivered)  : {out_nlpm:.1f} NLPM")
-    print("=======================================================")
+    # print("=======================================================")
+    # print("           SIMULATED CURRENT FILTER STATE              ")
+    # print("=======================================================")
+    # print(f"Inlet Line Pressure         : {p_inlet_pa / 100000.0:.3f} Bar absolute")
+    # print(f"Operational Gas Temperature : {t_inlet_k - 273.15:.1f} °C")
+    # print("-" * 55)
+    # print(f"Viscous Shear Loss Element  : {dp_v:.3f} mBar")
+    # print(f"Inertial Turbulent Path Loss: {dp_i:.3f} mBar")
+    # print(f"TOTAL CLEAN ASSEMBLY DROP   : {total_dp:.3f} mBar")
+    # print("-" * 55)
+    # print(f"Absolute Pressure Leaving   : {p_out_pa / 100000.0:.4f} Bar absolute")
+    # print("-" * 55)
+    # print(f"Flow Requested (Inlet)      : {inlet_nlpm:.1f} NLPM")
+    # print(f"Lost through 1.8mm Leak     : {leak_nlpm:.1f} NLPM")
+    # print(f"Surviving Flow (Delivered)  : {out_nlpm:.1f} NLPM")
+    # print("=======================================================")

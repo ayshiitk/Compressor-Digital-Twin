@@ -1,12 +1,13 @@
 import numpy as np
 
 class AdvancedVentilatorBMS:
-    def __init__(self, s_config=6, p_config=4, cell_capacity_ah=5.14, initial_soc=1.0):
+    def __init__(self, s_config=6, p_config=4, cell_capacity_ah=5.14, initial_soc=1.0, T_amb=25.0):
         # --- 1. Pack Architecture (6S4P Samsung 53G) ---
         self.S = s_config
         self.P = p_config
         self.pack_capacity_ah = cell_capacity_ah * self.P
         self.pack_capacity_amp_seconds = self.pack_capacity_ah * 3600
+        self.t_amb = T_amb
         self.soc = initial_soc
         
         # --- 2. Limits & Constraints (Datasheet) ---
@@ -21,7 +22,7 @@ class AdvancedVentilatorBMS:
         # --- 3. Electrical & Thermal Baselines ---
         self.cell_r0_base = 0.025 
         self.temp_c = 25.0
-        self.t_amb = 25.0
+        self.t_amb = T_amb
         self.thermal_mass = 1.85 * 1050.0  # Joules/°C
         
         # From 600W lab calibration
@@ -33,6 +34,14 @@ class AdvancedVentilatorBMS:
         self.r_th = self.r_th_60mm_fan
         self.fan_pwm = 0
         self.status = "INITIALIZED"
+        
+        # # --- NEW: Telemetry Smoothing ---
+        # self.smoothed_amps = 0.0
+
+
+        # --- NEW: Telemetry Smoothing ---
+        self.smoothed_amps = 0.0
+        self.displayed_mins = 999.0  # Add this line
 
     def get_pack_r0(self):
         """Temperature adjusted internal DC resistance"""
@@ -104,7 +113,7 @@ class AdvancedVentilatorBMS:
                 if abs(battery_amps) <= self.cutoff_charge_current:
                     self.status = "AC CONNECTED: STANDBY (100% FULL)"
                     battery_amps = 0.0
-                    time_remaining_mins = 0.0
+                    time_remaining_mins = 999.0
                 else:
                     self.status = "AC CONNECTED: CHARGING (CV TAPER)"
                     # Estimate remaining time in CV phase (~45 mins usually)
@@ -133,12 +142,27 @@ class AdvancedVentilatorBMS:
                 self.status = "BATTERY MODE: DISCHARGING"
                 battery_amps = compressor_draw_amps
                 
-                # Predict time to empty at current load
-                if battery_amps > 0:
-                    usable_capacity = self.soc * self.pack_capacity_ah
-                    time_remaining_mins = (usable_capacity / battery_amps) * 60.0
+                # Use a 10-second rolling average to catch real parameter changes
+                if self.smoothed_amps == 0.0 and battery_amps > 0:
+                    self.smoothed_amps = battery_amps  
                 else:
-                    time_remaining_mins = 999.0 # No load
+                    alpha = 0.005 
+                    self.smoothed_amps = (alpha * battery_amps) + ((1.0 - alpha) * self.smoothed_amps)
+                
+                if self.smoothed_amps > 0.1:
+                    usable_capacity = self.soc * self.pack_capacity_ah
+                    raw_calculated_mins = (usable_capacity / self.smoothed_amps) * 60.0
+                    
+                    # --- THE UX LATCH ---
+                    # If the true remaining time tries to climb (because of the startup 
+                    # sequence ending), we ignore it and hold the current display steady. 
+                    # We only update the display if the true time drops BELOW what we are showing.
+                    if raw_calculated_mins < self.displayed_mins:
+                        self.displayed_mins = raw_calculated_mins
+                    
+                    time_remaining_mins = self.displayed_mins
+                else:
+                    time_remaining_mins = 999.0
 
         # --- UPDATE PHYSICS VIA DIFFERENTIAL EQUATIONS ---
         

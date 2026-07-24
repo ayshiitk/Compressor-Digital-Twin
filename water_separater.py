@@ -1,15 +1,20 @@
 import numpy as np
 import math
+import Drain_leak_calc as dlc
+
 class SMC_AFG20_WaterSeparator:
     """
     Digital Twin Component: SMC AFG20-F02-J-D Water Separator
     Now includes a fully integrated psychrometric condensation model.
     """
-    def __init__(self, valve_closed=False):
+    def __init__(self, valve_closed=False, D2=1.0):
         self.component_name = "SMC AFG20 Water Separator"
         self.R_air = 287.05      
         self.rho_normal = 1.204  
         
+        self.Drain_leak = dlc.RestrictorFlowSolver()
+        self.drain_dia = D2  # mm, restrictor diameter for the drain hole (1.0mm for "J" option)
+
         # Manufacturer Specs (SMC AFG20-D)
         self.eta_max = 0.99             # 99% water droplet removal ratio
         self.Q_max_nlpm = 1000.0        # Max air flow capacity: 1,000 l/min (ANR)
@@ -25,22 +30,22 @@ class SMC_AFG20_WaterSeparator:
         self.drain_valve_closed = valve_closed 
         
         # ---------------------------------------------------------
-        # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
-        # ---------------------------------------------------------
-        d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
-        d2_restrictor_m = 1.0 / 1000.0  # Added pipe restrictor
+        # # SERIES ORIFICE PHYSICS (1.8mm bowl -> 1.0mm restrictor)
+        # # ---------------------------------------------------------
+        # d1_bowl_m = 1.8 / 1000.0        # Built-in bowl hole
+        # d2_restrictor_m = D2 / 1000.0  # Added pipe restrictor
         
-        A1 = math.pi * (d1_bowl_m / 2.0)**2
-        A2 = math.pi * (d2_restrictor_m / 2.0)**2
+        # A1 = math.pi * (d1_bowl_m / 2.0)**2
+        # A2 = math.pi * (d2_restrictor_m / 2.0)**2
         
         # Calculate the equivalent aerodynamic area of both holes in series
         # self.drain_hole_area_m2 = (A1 * A2) / math.sqrt(A1**2 + A2**2)
         # self.drain_hole_area_m2 = A2
 
-        A_theoretical =  2.165e-7
-        self.drain_hole_area_m2 = A_theoretical
+        # A_theoretical =  2.165e-7
+        # self.drain_hole_area_m2 = A2
         
-        self.Cd_drain = 1 # Standard discharge coefficient
+        # self.Cd_drain = 1 # Standard discharge coefficient
  
 
     def _calculate_condensation(self, T_amb_C, RH_amb, P_amb_pa, T_coil_C, P_coil_pa, m_dot_total_kg_s):
@@ -131,26 +136,26 @@ class SMC_AFG20_WaterSeparator:
     #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2 * gamma / (gamma - 1)) / (self.R_air * T_in_k) * (pr ** (2/gamma) - pr ** ((gamma + 1)/gamma)))
     #     return m_dot_leak
     
-    def _calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
-        """Calculates the continuous air purge escaping through the restrictor."""
+    # def _calculate_leakage(self, P_in_pa, T_in_k, P_atm_pa=101325.0):
+    #     """Calculates the continuous air purge escaping through the restrictor."""
         
-        # SAFETY CHECK: No leaking if valve is closed OR if system is in a vacuum!
-        if self.drain_valve_closed or P_in_pa <= P_atm_pa:
-            return 0.0 
+    #     # SAFETY CHECK: No leaking if valve is closed OR if system is in a vacuum!
+    #     if self.drain_valve_closed or P_in_pa <= P_atm_pa:
+    #         return 0.0 
             
-        pr = P_atm_pa / P_in_pa
-        gamma = 1.4
-        critical_ratio = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
+    #     pr = P_atm_pa / P_in_pa
+    #     gamma = 1.4
+    #     critical_ratio = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
         
-        # Calculate Mass Flow Rate leaking through the equivalent restrictor area
-        if pr <= critical_ratio:
-            # Choked (Sonic) Flow
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
-        else:
-            # Subsonic Flow
-            m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2.0 * gamma / (gamma - 1.0)) / (self.R_air * T_in_k) * (pr ** (2.0/gamma) - pr ** ((gamma + 1.0)/gamma)))
+    #     # Calculate Mass Flow Rate leaking through the equivalent restrictor area
+    #     if pr <= critical_ratio:
+    #         # Choked (Sonic) Flow
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt(gamma / (self.R_air * T_in_k)) * (2.0 / (gamma + 1.0)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
+    #     else:
+    #         # Subsonic Flow
+    #         m_dot_leak = self.Cd_drain * self.drain_hole_area_m2 * P_in_pa * math.sqrt((2.0 * gamma / (gamma - 1.0)) / (self.R_air * T_in_k) * (pr ** (2.0/gamma) - pr ** ((gamma + 1.0)/gamma)))
             
-        return m_dot_leak
+    #     return m_dot_leak
 
     def update_state(self, t, m_dot_in_kg_s, P_in_pa, T_in_k, T_amb_C, RH_amb, P_amb_pa=101325.0):
         """
@@ -175,8 +180,7 @@ class SMC_AFG20_WaterSeparator:
             dp_inertial = 0.0
             
         P_bowl_pa = max(0.0, P_in_pa - dp_inertial)
-        m_dot_leak_kg_s = self._calculate_leakage(P_bowl_pa, T_in_k, P_amb_pa)
-        leak_nlpm = (m_dot_leak_kg_s / 1.204) * 60000.0
+        m_dot_leak_kg_s, leak_nlpm = self.Drain_leak.calculate_flow(self.drain_dia, P_in_pa, T_in_k)
         # if t % 100 ==0:
         #     print(f"Leakage Mass Flow_nlpm_water: {leak_nlpm:.6f} nlpm at P_out_water: {P_bowl_pa/100000:.3f} Bar abs, T_in_water: {T_in_k-273.15:.1f} °C")
 
@@ -187,7 +191,7 @@ class SMC_AFG20_WaterSeparator:
         water_captured_mg_s = liquid_water_in_mg_s * eta_current
         water_escaped_mg_s = liquid_water_in_mg_s - water_captured_mg_s
         
-        return P_bowl_pa, dp_inertial, m_dot_effective, water_escaped_mg_s, vapor_passed_mg_s
+        return P_bowl_pa, dp_inertial/100, m_dot_effective, water_escaped_mg_s, vapor_passed_mg_s, leak_nlpm
     
 
         # return {
@@ -231,7 +235,7 @@ if __name__ == "__main__":
     print("\n[FLUID DYNAMICS]")
     print(f" -> Flow Rate: {results['Q_nlpm']:.1f} NLPM")
     print(f" -> Pressure Drop: {results['dp_pa']/100:.2f} mBar")
-    print(f" -> Valve Leak: {(results['m_dot_leak_kg_s']/1.204)*60000:.1f} NLPM")
+    print(f" -> Valve Leak: {results['leak_nlpm']:.1f} NLPM")
     
     print("\n[PSYCHROMETRICS & SEPARATION]")
     print(f" -> Total Humidity Ingested: {results['water_intake_mg_s']:.1f} mg/s")

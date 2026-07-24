@@ -3,8 +3,9 @@ import math
 
 class DischargeHose_HiPoFlex:
     """
-    Component Model: HiPoFlex Transparent Braided Silicone Hose
-    Dimensions: 9x16mm, 600mm Length, 3x 90-degree bends.
+    Component Model: HiPoFlex Transparent Braided Silicone Hose with Inlet Elbow
+    Dimensions: 9x16mm, 600mm Length, 3x 90-degree sweeping bends.
+    Fittings: 1x 90-degree inlet elbow connector at the pump discharge.
     Calculates combined fluid dynamic pressure drop and thermodynamic heat loss.
     """
     def __init__(self):
@@ -15,8 +16,14 @@ class DischargeHose_HiPoFlex:
         
         # 2. Material & Flow Geometry
         self.k_silicone = 0.25     # Thermal conductivity of silicone (W/m*K)
-        self.num_90_bends = 3      # Three 90-degree turns
-        self.K_per_bend = 0.25     # Minor loss coefficient for a sweeping 50mm radius bend
+        
+        # Minor Loss Coefficients (K-factors)
+        self.K_inlet_elbow =  0.9 # Sharp 90-degree pneumatic elbow fitting at pump outlet
+                                    # (matched to intake-side exit elbow -- same physical
+                                    # fitting used at both pump head connections)
+        self.num_90_bends = 3      # Three sweeping 90-degree hose turns
+        self.K_per_bend = 0.25     # Minor loss for a sweeping 50mm radius bend
+        
         self.h_out = 7.0           # Natural convection coefficient for still room air (W/m2*K)
         
         # 3. Static Air Properties
@@ -45,12 +52,12 @@ class DischargeHose_HiPoFlex:
 
     def calculate_hose_state(self, m_dot_kg_s, P_in_pa, T_in_k, T_amb_k):
         """
-        Passes hot compressed air through the 600mm hose, calculating exactly 
-        how much pressure is destroyed and how much heat escapes.
+        Passes hot compressed air through the inlet fitting and 600mm hose, 
+        calculating exactly how much pressure is destroyed and how much heat escapes.
         """
         # If the compressor is completely off, return ambient/static conditions
         if m_dot_kg_s <= 0.0001:
-            return P_in_pa, T_amb_k
+            return P_in_pa, T_amb_k, 0.0
 
         # Fetch live air properties based on incoming temperature
         mu_air, k_air, Pr_air = self._get_dynamic_air_properties(T_in_k)
@@ -60,7 +67,7 @@ class DischargeHose_HiPoFlex:
         # ==========================================
         # Step 1: Flow Velocity
         area_in = math.pi * (self.D_in / 2.0)**2
-        rho_in = P_in_pa / (self.R_air * T_in_k)  # Density at 4 Bar is ~4x normal
+        rho_in = P_in_pa / (self.R_air * T_in_k)  
         velocity = m_dot_kg_s / (rho_in * area_in)
         
         # Step 2: Reynolds Number (Turbulence)
@@ -76,9 +83,11 @@ class DischargeHose_HiPoFlex:
         dyn_pressure = 0.5 * rho_in * velocity**2
         
         delta_p_straight = f * (self.L / self.D_in) * dyn_pressure
+        delta_p_inlet = self.K_inlet_elbow * dyn_pressure
         delta_p_bends = (self.num_90_bends * self.K_per_bend) * dyn_pressure
         
-        P_out_pa = P_in_pa - (delta_p_straight + delta_p_bends)
+        # Deduct all friction and fitting losses from the initial pressure
+        P_out_pa = P_in_pa - (delta_p_straight + delta_p_inlet + delta_p_bends)
 
         # ==========================================
         # PART 2: THERMODYNAMICS (Heat Loss via NTU)
@@ -108,9 +117,9 @@ class DischargeHose_HiPoFlex:
         # Total Watts of heat radiated into the still room air
         heat_loss_watts = C_min * (T_in_k - T_out_k)
 
-        return P_out_pa, T_out_k 
+        # BUG FIX: Returning all 3 values required by the unpacker
+        return P_out_pa, T_out_k, heat_loss_watts 
     
-
 
 # =====================================================================
 # SIMULATION EXECUTION (TEST BLOCK)
@@ -120,12 +129,12 @@ if __name__ == "__main__":
     hose = DischargeHose_HiPoFlex()
     
     # Simulating the air leaving the compressor head
-    test_m_dot = 0.002           # approx 90  NLPM flow
+    test_m_dot = 0.002           # approx 90 NLPM flow
     test_press_pa = 400000.0     # 4.0 Bar Absolute
     test_temp_k = 273.15 + 95.0  # 95°C hot gas
     test_amb_k = 273.15 + 25.0   # 25°C still room air
     
-    # Run the physics engine
+    # Run the physics engine (BUG FIXED: correctly unpacking 3 variables)
     p_final, t_final, watts_lost = hose.calculate_hose_state(
         m_dot_kg_s=test_m_dot, 
         P_in_pa=test_press_pa, 
@@ -136,7 +145,7 @@ if __name__ == "__main__":
     # Print the physical realities
     print("=== HiPoFlex 600mm Hose Physics Results ===")
     print(f"Compressor Output:  {test_press_pa/100000.0:.2f} Bar, {test_temp_k-273.15:.1f} °C")
-    print(f"Pressure Dropped:   {(test_press_pa - p_final)/100.0:.1f} mBar (Destroyed by friction/bends)")
+    print(f"Pressure Dropped:   {(test_press_pa - p_final)/100.0:.1f} mBar (Friction + Elbow + Bends)")
     print(f"Coil Arrival Pres:  {p_final/100000.0:.3f} Bar")
     print("-" * 43)
     print(f"Temp Dropped:       {(test_temp_k - t_final):.1f} °C (Insulated by 3.5mm wall/still air)")
